@@ -1,0 +1,72 @@
+# ===========================================================================
+# docker-compose.dev.yml
+# Full stack for dev/production deployment (EC2)
+# Backend connects to RDS/managed DB.
+# ===========================================================================
+
+services:
+  # ── Django Backend ─────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: dev
+      args:
+        - CACHEBUST=${CACHEBUST:-1}
+    container_name: yuvro-marketplace-cloudvex-backend-dev
+    env_file:
+      - ./backend/.env.dev
+      - path: ./backend/.env.dev-secrets
+        required: false
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             gunicorn --bind 0.0.0.0:8004 --workers 3 --timeout 120 config.wsgi:application"
+    ports:
+      - "8004:8004"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/api/health/"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    networks:
+      - yuvro-marketplace-cloudvex-dev
+
+  # ── TanStack Start Frontend (SSR) ──────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: dev
+      args:
+        - VITE_BACKEND_API_BASE_URL=${VITE_BACKEND_API_BASE_URL:-https://backend-marketplace.yuvro.ai/api}
+        - VITE_YHUB_BACKEND_API_BASE_URL=${VITE_YHUB_BACKEND_API_BASE_URL:-https://backend-hub-dev.yuvro.ai/api}
+        - CACHEBUST=${CACHEBUST:-1}
+    container_name: yuvro-marketplace-cloudvex-frontend-dev
+    env_file:
+      - ./frontend/.env.dev
+      - path: ./frontend/.env.dev-secrets
+        required: false
+    environment:
+      PORT: "3004"
+      NITRO_PORT: "3004"
+    ports:
+      - "3004:3004"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3004/"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: always
+    networks:
+      - yuvro-marketplace-cloudvex-dev
+
+networks:
+  yuvro-marketplace-cloudvex-dev:
+    driver: bridge

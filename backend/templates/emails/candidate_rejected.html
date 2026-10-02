@@ -1,0 +1,81 @@
+{% extends "emails/base_email.html" %}
+
+{% block content %}
+<h1 style="margin: 0 0 16px 0; font-size: 20px; font-weight: 700; color: #0F172A; line-height: 1.3;">
+  Candidate Status Update
+</h1>
+
+<p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+  Hello {{ recruiter_name|default:"Recruiter" }},
+</p>
+
+<p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+  We are writing to inform you that your candidate <strong>{{ candidate_name }}</strong> for the role <strong>{{ job_title }}</strong> at <strong>{{ company_name }}</strong> was not selected to proceed further in the hiring pipeline.
+</p>
+
+<p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+  The candidate application has been closed at the <strong>{{ rejected_stage_label }}</strong> stage.
+</p>
+{% endblock content %}
+
+{% block details %}
+<div style="margin: 22px 0; border: 1px solid #E2E8F0; border-radius: 8px; background-color: #F8FAFC; padding: 16px 18px;">
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+    <tr>
+      <td valign="top" style="padding: 6px 0; font-size: 13px; font-weight: 600; color: #64748B; width: 35%;">
+        Candidate
+      </td>
+      <td valign="top" style="padding: 6px 0; font-size: 13px; font-weight: 600; color: #0F172A;">
+        {{ candidate_name }}
+      </td>
+    </tr>
+    <tr>
+      <td valign="top" style="padding: 6px 0; font-size: 13px; font-weight: 600; color: #64748B;">
+        Role / Job
+      </td>
+      <td valign="top" style="padding: 6px 0; font-size: 13px; font-weight: 500; color: #0F172A;">
+        {{ job_title }}
+      </td>
+    </tr>
+    <tr>
+      <td valign="top" style="padding: 6px 0; font-size: 13px; font-weight: 600; color: #64748B;">
+        Company
+      </td>
+      <td valign="top" style="padding: 6px 0; font-size: 13px; font-weight: 500; color: #0F172A;">
+        {{ company_name }}
+      </td>
+    </tr>
+    <tr>
+      <td valign="top" style="padding: 6px 0; font-size: 13px; font-weight: 600; color: #64748B;">
+        Stage Rejected At
+      </td>
+      <td valign="top" style="padding: 6px 0; font-size: 13px; font-weight: 600; color: #DC2626;">
+        <span style="display: inline-block; padding: 2px 8px; border-radius: 4px; background-color: #FEE2E2; color: #991B1B; font-size: 12px;">
+          {{ rejected_stage_label }}
+        </span>
+      </td>
+    </tr>
+    <tr>
+      <td valign="top" style="padding: 6px 0; font-size: 13px; font-weight: 600; color: #64748B;">
+        Status
+      </td>
+      <td valign="top" style="padding: 6px 0; font-size: 13px; font-weight: 600; color: #DC2626;">
+        Rejected
+      </td>
+    </tr>
+  </table>
+</div>
+{% endblock details %}
+
+{% block highlight %}
+{% if rejection_reason %}
+<div style="margin: 18px 0; border-left: 3px solid #EF4444; background-color: #FEF2F2; padding: 12px 16px; border-radius: 0 6px 6px 0;">
+  <p style="margin: 0 0 4px 0; font-size: 12px; font-weight: 700; color: #991B1B; text-transform: uppercase; letter-spacing: 0.5px;">
+    Reason / Feedback
+  </p>
+  <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #7F1D1D; font-style: italic;">
+    &ldquo;{{ rejection_reason }}&rdquo;
+  </p>
+</div>
+{% endif %}
+{% endblock highlight %}

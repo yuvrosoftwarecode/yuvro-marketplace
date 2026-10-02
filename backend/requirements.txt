@@ -1,0 +1,55 @@
+# ===========================================================================
+# yuvro-marketplace Backend Requirements
+# ===========================================================================
+
+# --- Core -------------------------------------------------------------------
+Django==5.1.7
+djangorestframework==3.15.2
+
+# --- Database ---------------------------------------------------------------
+psycopg[binary]==3.2.9          # PostgreSQL v3 driver
+dj-database-url==2.3.0          # DATABASE_URL -> DATABASES dict
+
+# --- Configuration ----------------------------------------------------------
+python-decouple==3.8             # reads .env files cleanly
+
+# --- Authentication ---------------------------------------------------------
+djangorestframework-simplejwt==5.5.0
+django-allauth[google]==65.3.0   # Google OAuth + social auth
+
+# --- API Utilities ----------------------------------------------------------
+django-cors-headers==4.7.0
+django-filter==24.3
+drf-spectacular==0.28.0          # OpenAPI 3 schema + Swagger UI
+
+# --- Object Storage ---------------------------------------------------------
+boto3==1.38.19
+django-storages[s3]==1.14.6
+
+# --- WSGI Server ------------------------------------------------------------
+gunicorn==23.0.0
+whitenoise==6.9.0                # Static files serving (production)
+
+
+# --- OpenTelemetry ----------------------------------------------------------
+opentelemetry-api==1.32.1
+opentelemetry-sdk==1.32.1
+opentelemetry-exporter-otlp-proto-grpc==1.32.1
+opentelemetry-instrumentation-django==0.53b1
+opentelemetry-instrumentation-requests==0.53b1
+opentelemetry-instrumentation-logging==0.53b1
+opentelemetry-instrumentation-psycopg==0.53b1
+
+# --- Metrics ----------------------------------------------------------------
+prometheus-client==0.21.1
+
+# --- Utilities --------------------------------------------------------------
+Pillow==11.2.1                   # Image handling for user avatars
+requests==2.32.3
+cryptography==44.0.1
+PyJWT[crypto]<2.10.0
+
+# --- Dev / Code Quality -----------------------------------------------------
+black==25.1.0
+isort==5.13.2
+flake8==7.2.0

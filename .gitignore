@@ -1,0 +1,95 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+*.so
+.venv/
+venv/
+ENV/
+.eggs/
+
+# Django
+*.sqlite3
+staticfiles/
+mediafiles/
+local_settings.py
+
+# Environment files (NEVER commit these)
+.env
+.env.local
+.env.dev
+.env.staging
+.env.prod
+.env.*-secrets
+!.env.*.example
+
+# Node.js & Bun
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+bun.lockb
+bun.lock
+
+# TanStack Start / Vite build output
+frontend/.output/
+frontend/dist/
+frontend/.cache/
+frontend/.tanstack/
+frontend/.wrangler/
+
+# Docker
+.dockerenv
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+celerybeat-schedule
+celerybeat.pid
+
+# OpenTofu / Terraform (including large ~600MB provider binaries in .terraform/)
+.terraform/
+**/.terraform/
+**/.terraform/*
+**/terraform-provider-*
+terraform-provider-*
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+tfplan*
+*.tfplan*
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+dev.tfvars
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+crash.log
+crash.*.log
+.terraformrc
+terraform.rc
+
