@@ -328,10 +328,21 @@ docker compose -f docker-compose.dev.yml build --build-arg BUILDKIT_INLINE_CACHE
 
 echo "── docker up ───────────────────────────────────────"
 docker network create yuvro-marketplace-cloudvex-dev 2>/dev/null || true
-docker compose -f docker-compose.dev.yml up -d --remove-orphans --force-recreate
+
+# Use dev-ymarketplace compose for EC2 (uses RDS, no local DB)
+if [ -f docker-compose.dev-ymarketplace.yml ]; then
+    docker compose -f docker-compose.dev-ymarketplace.yml up -d --remove-orphans --force-recreate
+else
+    # Fallback to docker-compose.dev.yml if in local dev environment
+    docker compose -f docker-compose.dev.yml up -d --remove-orphans --force-recreate
+fi
 
 echo "── status ──────────────────────────────────────────"
-docker compose -f docker-compose.dev.yml ps
+if [ -f docker-compose.dev-ymarketplace.yml ]; then
+    docker compose -f docker-compose.dev-ymarketplace.yml ps
+else
+    docker compose -f docker-compose.dev.yml ps
+fi
 
 echo ""
 echo "✅ Deployment complete! [total \$(elapsed_s)]"
