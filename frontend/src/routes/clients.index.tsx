@@ -298,7 +298,7 @@ function YourJobsPage() {
               {rows.map((j) => (
                 <article key={j.id} className="flex flex-col bg-surface p-4">
                   <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3">
-                    <CompanyMark short={j.companyShort} tone={j.logoTone} />
+                    <CompanyMark short={j.companyShort} tone={j.logoTone} logoUrl={j.logoUrl} />
                     <div className="min-w-0">
                       <Link
                         to="/jobs/$jobId"
@@ -381,7 +381,7 @@ function YourJobsPage() {
                           params={{ jobId: j.id }}
                           className="flex min-w-0 items-center gap-3"
                         >
-                          <CompanyMark short={j.companyShort} tone={j.logoTone} size="sm" />
+                          <CompanyMark short={j.companyShort} tone={j.logoTone} logoUrl={j.logoUrl} size="sm" />
                           <span className="min-w-0">
                             <span className="block truncate text-[13px] font-semibold text-foreground">
                               {j.company}

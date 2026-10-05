@@ -206,13 +206,44 @@ export function CompanyMark({
   short,
   tone,
   size = "md",
+  logoUrl,
 }: {
   short: string;
   tone: string;
   size?: "sm" | "md" | "lg";
+  logoUrl?: string;
 }) {
+  const [imgError, setImgError] = useState(false);
   const dims =
     size === "sm" ? "size-7 text-[10px]" : size === "lg" ? "size-12 text-sm" : "size-9 text-[11px]";
+
+  const resolvedLogo =
+    logoUrl && typeof logoUrl === "string" && logoUrl.trim()
+      ? logoUrl.includes("minio:9000")
+        ? logoUrl.replace("minio:9000", "localhost:9000")
+        : logoUrl.trim()
+      : undefined;
+
+  if (resolvedLogo && !imgError) {
+    return (
+      <span
+        className={cn(
+          "grid shrink-0 place-items-center rounded-md border border-border bg-white overflow-hidden p-1 shadow-sm",
+          dims,
+        )}
+      >
+        <img
+          src={resolvedLogo}
+          alt={short}
+          crossOrigin="anonymous"
+          data-company-logo="true"
+          className="size-full object-contain"
+          onError={() => setImgError(true)}
+        />
+      </span>
+    );
+  }
+
   return (
     <span
       className={cn(

@@ -194,7 +194,7 @@ function RoleRow({ job }: { job: Job }) {
       params={{ jobId: job.id }}
       className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 px-4 py-3.5 transition-colors hover:bg-surface-sunken"
     >
-      <CompanyMark short={job.companyShort} tone={job.logoTone} />
+      <CompanyMark short={job.companyShort} tone={job.logoTone} logoUrl={job.logoUrl} />
       <div className="min-w-0">
         <p className="truncate text-[14px] font-semibold leading-5 text-foreground">
           {job.title}

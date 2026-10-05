@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { getStageLabel } from "@/lib/am-data";
+import { useAuth } from "@/lib/auth";
 import { authService } from "@/services/authService";
 
 export const Route = createFileRoute("/company/")({
@@ -89,6 +90,7 @@ function formatRelativeTime(dateStr?: string | null): string {
 
 function CompanyHomePage() {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const [company, setCompany] = useState<any>(null);
   const [jobs, setJobs] = useState<CompanyJob[]>([]);
   const [submissions, setSubmissions] = useState<any[]>([]);
@@ -153,8 +155,7 @@ function CompanyHomePage() {
   }, []);
 
   const handleSignOut = () => {
-    authService.logout();
-    navigate({ to: "/company/login" });
+    logout("/company/login");
   };
 
   const openJobs = useMemo(

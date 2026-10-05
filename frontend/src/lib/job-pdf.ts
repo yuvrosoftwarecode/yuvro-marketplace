@@ -10,14 +10,113 @@ const SHADE: RGB = [246, 247, 250];
 const NAVY: RGB = [22, 33, 62];
 const LINK: RGB = [37, 78, 170];
 
-const clean = (s: string) =>
-  s.replace(/[–—]/g, "-").replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/·/g, "-").replace(/[^\x20-\x7E\n]/g, "");
+const clean = (s?: unknown) =>
+  String(s ?? "")
+    .replace(/[–—]/g, "-")
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/·/g, "-")
+    .replace(/[^\x20-\x7E\n]/g, "");
+
+async function loadLogoImage(url: string): Promise<string | null> {
+  if (typeof window === "undefined" || !url) return null;
+  if (url.startsWith("data:image/png") || url.startsWith("data:image/jpeg")) return url;
+
+  const resolvedUrl = url.includes("minio:9000")
+    ? url.replace("minio:9000", "localhost:9000")
+    : url;
+
+  const toPngViaImage = (src: string): Promise<string | null> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth || img.width || 96;
+          canvas.height = img.naturalHeight || img.height || 96;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL("image/png"));
+            return;
+          }
+        } catch {
+          // If canvas is tainted or context unavailable
+        }
+        resolve(null);
+      };
+      img.onerror = () => resolve(null);
+      img.src = src;
+    });
+  };
+
+  try {
+    const res = await fetch(resolvedUrl);
+    if (res.ok) {
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const png = await toPngViaImage(objectUrl);
+      URL.revokeObjectURL(objectUrl);
+      if (png) return png;
+    }
+  } catch {
+    // Fall back to direct image loading
+  }
+
+  return await toPngViaImage(resolvedUrl);
+}
+
+let cachedJsPDF: any = null;
+if (typeof window !== "undefined") {
+  import("jspdf").then((m) => {
+    cachedJsPDF = m.jsPDF;
+  }).catch(() => {});
+}
+
+const logoDataUrlCache = new Map<string, string>();
+
+function getRenderedLogoDataUrl(url: string): string | null {
+  if (typeof document === "undefined" || !url) return null;
+  const imgs = Array.from(document.querySelectorAll<HTMLImageElement>("img"));
+  const matched = imgs.find(
+    (img) =>
+      img.src === url ||
+      img.currentSrc === url ||
+      (url && img.src && (img.src.includes(url) || url.includes(img.src)))
+  );
+  if (matched && matched.complete && matched.naturalWidth > 0) {
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = matched.naturalWidth;
+      canvas.height = matched.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.drawImage(matched, 0, 0);
+        return canvas.toDataURL("image/png");
+      }
+    } catch {
+      // tainted canvas or other error
+    }
+  }
+  return null;
+}
+
+export async function preloadJobLogo(url?: string): Promise<string | null> {
+  if (!url) return null;
+  const cached = logoDataUrlCache.get(url);
+  if (cached) return cached;
+  const dataUrl = await loadLogoImage(url);
+  if (dataUrl) {
+    logoDataUrlCache.set(url, dataUrl);
+  }
+  return dataUrl;
+}
 
 export async function downloadJobPdf(job: Job) {
   try {
-    const jspdfModule = "jspdf";
-    const { jsPDF } = await import(/* @vite-ignore */ jspdfModule);
-    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const jsPdfClass = cachedJsPDF || (await import("jspdf")).jsPDF;
+    const doc = new jsPdfClass({ unit: "pt", format: "a4" });
     const W = doc.internal.pageSize.getWidth();
     const H = doc.internal.pageSize.getHeight();
     const M = 40;
@@ -46,26 +145,74 @@ export async function downloadJobPdf(job: Job) {
       }
     };
 
-    // Header band
+    // ---------- Header band ----------
     const bandH = 84;
     doc.setFillColor(...TINT);
     doc.rect(0, 0, W, bandH, "F");
-    doc.setFillColor(...NAVY);
-    doc.roundedRect(M, 18, 48, 48, 8, 8, "F");
-    font(14, "bold", [255, 255, 255]);
-    doc.text(clean(job.companyShort || job.company.slice(0, 2)).toUpperCase(), M + 24, 47, { align: "center" });
+
+    const logoCandidate =
+      job.logoUrl ||
+      (job as any).logo_url ||
+      (job as any).logo ||
+      (job as any).company?.logo_url ||
+      (job as any).company?.logo;
+
+    let logoDataUrl: string | null = null;
+    if (logoCandidate) {
+      logoDataUrl =
+        logoDataUrlCache.get(logoCandidate) ||
+        getRenderedLogoDataUrl(logoCandidate);
+
+      if (!logoDataUrl) {
+        logoDataUrl = await loadLogoImage(logoCandidate);
+        if (logoDataUrl) {
+          logoDataUrlCache.set(logoCandidate, logoDataUrl);
+        }
+      }
+    }
+
+    if (logoDataUrl) {
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(...LINE);
+      doc.roundedRect(M, 18, 48, 48, 8, 8, "FD");
+      try {
+        doc.addImage(logoDataUrl, "PNG", M + 4, 22, 40, 40, undefined, "FAST");
+      } catch (err) {
+        console.warn("Could not render logo in PDF, falling back to text:", err);
+        doc.setFillColor(...NAVY);
+        doc.roundedRect(M, 18, 48, 48, 8, 8, "F");
+        font(14, "bold", [255, 255, 255]);
+        doc.text(clean(job.companyShort || (job.company || "CO").slice(0, 2)).toUpperCase(), M + 24, 47, { align: "center" });
+      }
+    } else {
+      doc.setFillColor(...NAVY);
+      doc.roundedRect(M, 18, 48, 48, 8, 8, "F");
+      font(14, "bold", [255, 255, 255]);
+      doc.text(clean(job.companyShort || (job.company || "CO").slice(0, 2)).toUpperCase(), M + 24, 47, { align: "center" });
+    }
+
     font(20, "bold", INK);
-    doc.text(doc.splitTextToSize(clean(job.title), CW - 70)[0] as string, M + 64, 40);
+    doc.text(doc.splitTextToSize(clean(job.title || "Job Title"), CW - 70)[0] as string, M + 64, 40);
     font(10.5, "normal", MUTED);
-    doc.text(clean(job.company + (job.formerly ? ` (formerly ${job.formerly})` : "")), M + 64, 58);
+    doc.text(clean((job.company || "Company") + (job.formerly ? ` (formerly ${job.formerly})` : "")), M + 64, 58);
     y = bandH + 16;
 
-    // Company stats strip
+    // ---------- Company stats strip ----------
+    const rawFounded =
+      job.founded && job.founded !== "—" && job.founded !== "-"
+        ? String(job.founded)
+        : (job as any).founded_year
+        ? String((job as any).founded_year)
+        : (job as any).company?.founded_year
+        ? String((job as any).company?.founded_year)
+        : "-";
+    const foundedVal = rawFounded && rawFounded.trim() ? rawFounded.trim() : "-";
+
     const stats: [string, string, boolean?][] = [
       ["STAGE", job.fundingStage || "-"],
       ["WEBSITE", job.website || "-", true],
       ["TEAM SIZE", job.companySize || "-"],
-      ["FOUNDED", String(job.founded || "-")],
+      ["FOUNDED", clean(foundedVal)],
     ];
     const sw = CW / stats.length;
     doc.setDrawColor(...LINE);
@@ -79,10 +226,11 @@ export async function downloadJobPdf(job: Job) {
       font(9.5, "bold", link ? LINK : INK);
       const val = clean(v);
       doc.text(val, cx, y + 31, { align: "center" });
+      if (link && v && String(v).startsWith("http")) doc.link(cx - doc.getTextWidth(val) / 2, y + 22, doc.getTextWidth(val), 12, { url: String(v) });
     });
     y += 64;
 
-    // Key Job Info table
+    // ---------- Key Job Info table ----------
     font(13, "bold", INK);
     doc.text("Key Job Info", M, y + 12);
     y += 24;
@@ -93,8 +241,6 @@ export async function downloadJobPdf(job: Job) {
       ["Experience", job.experience || "Not specified"],
       ["Salary Range", (job.salary || "Not specified") + (job.equity ? ` + equity ${job.equity}` : "")],
       ["Visa Sponsorship", job.visaSponsorship || "Not specified"],
-      ["Head Count", `${job.openings} role${job.openings === 1 ? "" : "s"}`],
-      ["Bounty", `${job.reward} - ${job.rewardPct} - 30-60-90`],
     ];
     const half = CW / 2;
     const labW = 92;
@@ -119,7 +265,7 @@ export async function downloadJobPdf(job: Job) {
     }
     y += 22;
 
-    // Job Description
+    // ---------- Job Description ----------
     ensure(40);
     font(13, "bold", INK);
     doc.text("Job Description", M, y + 12);
@@ -143,22 +289,46 @@ export async function downloadJobPdf(job: Job) {
       y += 2;
     };
 
-    const companyBlurb = job.about?.find((s) => s.heading.toLowerCase().includes("company"))?.body ?? job.repeatFounders;
-    sub(`About ${job.company}`);
-    if (companyBlurb) para(companyBlurb, X, TW);
+    const aboutList = Array.isArray(job.about) ? job.about : [];
+    const rawBlurb =
+      aboutList.find((s) => s?.heading?.toLowerCase().includes("company"))?.body ||
+      job.companyOverview ||
+      (job.repeatFounders && job.repeatFounders !== "—" && job.repeatFounders !== "-"
+        ? job.repeatFounders
+        : "");
+    const companyBlurb =
+      rawBlurb && rawBlurb !== "—" && rawBlurb !== "-" ? rawBlurb.trim() : "";
 
-    for (const s of (job.about || []).filter((s) => !s.heading.toLowerCase().includes("company"))) {
-      sub(s.heading);
-      if (/responsib|own/i.test(s.heading)) {
-        s.body.split(/\.\s+/).map((x) => x.replace(/\.$/, "").trim()).filter(Boolean).forEach((t) => item(t));
-      } else para(s.body, X, TW);
+    if (companyBlurb) {
+      sub(`About ${job.company || "Company"}`);
+      para(companyBlurb, X, TW);
     }
 
-    if (job.requirements?.length) {
+    for (const s of aboutList.filter((s) => !s?.heading?.toLowerCase().includes("company"))) {
+      if (!s) continue;
+      sub(s.heading || "Details");
+      if (/responsib|own/i.test(s.heading || "")) {
+        String(s.body || "").split(/\.\s+/).map((x) => x.replace(/\.$/, "").trim()).filter(Boolean).forEach((t) => item(t));
+      } else para(s.body || "", X, TW);
+    }
+
+    const reqs = Array.isArray(job.requirements) ? job.requirements : [];
+    if (reqs.length) {
       sub("Must-Have");
-      job.requirements.forEach((r, i) => item(r, i + 1));
+      reqs.forEach((r, i) => item(r, i + 1));
+    }
+    const nice = Array.isArray(job.greenFlags) ? job.greenFlags : [];
+    if (nice.length) {
+      sub("Nice-to-Have");
+      nice.forEach((r) => item(r));
+    }
+    const bens = Array.isArray(job.benefits) ? job.benefits : [];
+    if (bens.length) {
+      sub("Benefits & Perks");
+      bens.forEach((b) => item(`${b.group || "Perks"}: ${Array.isArray(b.items) ? b.items.join(", ") : b.items || ""}`));
     }
 
+    // ---------- Footer ----------
     const pages = doc.getNumberOfPages();
     for (let p = 1; p <= pages; p++) {
       doc.setPage(p);
@@ -169,9 +339,30 @@ export async function downloadJobPdf(job: Job) {
       doc.text("Generated by Yuvro", W - M, H - 22, { align: "right" });
     }
 
-    const slug = `${job.companyShort || job.company}-${job.title}`.replace(/[^a-z0-9]+/gi, "_").replace(/^_|_$/g, "");
-    doc.save(`${slug}_JD.pdf`);
-  } catch {
-    window.print();
+    const slug = `${clean(job.companyShort || job.company || "Job")}-${clean(job.title || "JD")}`.replace(/[^a-z0-9]+/gi, "_").replace(/^_|_$/g, "");
+    const filename = `${slug || "Job"}_JD.pdf`;
+
+    try {
+      const blob = doc.output("blob");
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = filename;
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        try {
+          document.body.removeChild(link);
+          URL.revokeObjectURL(blobUrl);
+        } catch {
+          // cleanup
+        }
+      }, 500);
+    } catch {
+      doc.save(filename);
+    }
+  } catch (err) {
+    console.error("Failed to generate job PDF:", err);
   }
 }

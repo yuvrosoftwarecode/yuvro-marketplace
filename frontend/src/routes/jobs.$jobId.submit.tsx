@@ -1,10 +1,19 @@
 import { useRef, useState, useEffect, useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { AlertCircle, FileText, Loader2, Sparkles, Upload, X, Send } from "lucide-react";
+import { AlertCircle, FileText, Loader2, Sparkles, Upload, X, Send, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { StatusBadge } from "@/components/app/status-badge";
 import { getJob, type Job } from "@/lib/data";
 import { fetchRecruiterJobById } from "@/lib/recruiter-jobs";
@@ -56,6 +65,20 @@ const empty: Form = {
   visaStatus: "",
   recruiterComments: "",
 };
+
+const TERMS_AND_CONDITIONS: string[] = [
+  "I have sourced this candidate through my own sourcing methods and have the right to represent the candidate for this requirement.",
+  "I have spoken to the candidate and confirmed that the candidate is interested in the opportunity.",
+  "I have informed the candidate about the role and received the candidate's consent to submit their profile.",
+  "The candidate's details, experience, skills, salary, notice period, location and other information shared by me are accurate to the best of my knowledge.",
+  "To the best of my knowledge, this candidate has not already been submitted by me for the same requirement through another recruiter or channel.",
+  "I will not submit duplicate, fake, misleading or unauthorised profiles.",
+  "I have reviewed the recruiter payment/fee and payment conditions mentioned for this requirement and agree to them.",
+  "I understand that the payment for this submission will be made only when the payment conditions mentioned in the requirement are fulfilled, including any applicable joining, retention, replacement or guarantee-period conditions.",
+  "I understand that submitting a profile does not guarantee an interview, selection, hiring or payment.",
+  "I understand that Yuvro may reject a profile if it is a duplicate, contains incorrect information, or does not meet the requirement.",
+  "I agree to follow Yuvro's recruiter terms, client requirements and applicable data privacy requirements.",
+];
 
 function Section({
   title,
@@ -134,6 +157,7 @@ function SubmitTab() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [consent, setConsent] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [backendDuplicateMatch, setBackendDuplicateMatch] = useState<{
     candidateName?: string;
@@ -788,25 +812,31 @@ function SubmitTab() {
             </div>
           </div>
           <div className="border-t border-border p-3">
-            <label className="mb-3 flex cursor-pointer items-start gap-2 text-xs leading-5 text-muted-foreground">
+            <div className="mb-3 flex items-start gap-2 text-xs leading-5 text-muted-foreground">
               <input
+                id="submission-consent"
                 type="checkbox"
                 checked={consent}
                 onChange={(e) => setConsent(e.target.checked)}
-                className="mt-0.5 size-4 shrink-0 accent-[var(--brand)]"
+                className="mt-0.5 size-4 shrink-0 accent-[var(--brand)] cursor-pointer"
               />
-              <span>
-                I confirm that the candidate has been contacted and agreed to apply for this role, and I accept the{" "}
-                <a
-                  href="/help"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-semibold text-brand underline-offset-2 hover:underline"
+              <div className="flex-1">
+                <label htmlFor="submission-consent" className="cursor-pointer select-none">
+                  I confirm that the candidate has been contacted and agreed to apply for this role, and I accept the{" "}
+                </label>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setTermsOpen(true);
+                  }}
+                  className="font-semibold text-brand underline-offset-2 hover:underline inline p-0 bg-transparent border-0 cursor-pointer align-baseline"
                 >
                   Terms &amp; Conditions
-                </a>.
-              </span>
-            </label>
+                </button>.
+              </div>
+            </div>
             <button
               type="button"
               disabled={!canSubmit || !consent || isSubmitting || Boolean(duplicateLinkedinMatch)}
@@ -832,6 +862,64 @@ function SubmitTab() {
           </div>
         </div>
       </aside>
+
+      {/* Terms & Conditions Modal */}
+      <Dialog open={termsOpen} onOpenChange={setTermsOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden sm:rounded-lg">
+          <DialogHeader className="border-b border-border px-6 py-4 text-left">
+            <div className="flex items-center gap-2.5">
+              <span className="grid size-9 place-items-center rounded-lg bg-brand-soft text-brand">
+                <ShieldCheck className="size-5" />
+              </span>
+              <div>
+                <DialogTitle className="text-base font-semibold text-foreground">
+                  Terms &amp; Conditions
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                  Candidate representation &amp; recruiter submission guidelines
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+            <p className="text-[13px] font-semibold text-foreground">
+              By submitting this candidate profile, I confirm that:
+            </p>
+            <ul className="space-y-2.5 text-xs text-muted-foreground">
+              {TERMS_AND_CONDITIONS.map((clause, idx) => (
+                <li key={idx} className="flex items-start gap-2.5 leading-relaxed">
+                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-brand" />
+                  <span className="text-foreground/90">{clause}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <DialogFooter className="border-t border-border bg-surface-sunken/40 px-6 py-3 sm:flex sm:justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setTermsOpen(false)}
+            >
+              Close
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="bg-brand text-brand-foreground hover:bg-brand/90"
+              onClick={() => {
+                setConsent(true);
+                setTermsOpen(false);
+                toast.success("Terms & Conditions accepted");
+              }}
+            >
+              I Agree &amp; Accept
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

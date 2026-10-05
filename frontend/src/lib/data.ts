@@ -27,6 +27,7 @@ export type Job = {
   whyFit?: string;
   company: string;
   companyShort: string;
+  logoUrl?: string;
   formerly?: string;
   logoTone: string;
   title: string;

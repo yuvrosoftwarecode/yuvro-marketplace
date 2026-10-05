@@ -19,7 +19,7 @@ import { CompanyMark } from "@/components/app/primitives";
 import { StatusBadge, clientStatusTone } from "@/components/app/status-badge";
 import { getJob, statusLabel, type Job } from "@/lib/data";
 import { cn } from "@/lib/utils";
-import { downloadJobPdf } from "@/lib/job-pdf";
+import { downloadJobPdf, preloadJobLogo } from "@/lib/job-pdf";
 import { useJobOrigin } from "@/lib/job-origin";
 import { useEffect, useState } from "react";
 import { fetchRecruiterJobById } from "@/lib/recruiter-jobs";
@@ -154,6 +154,12 @@ function JobWorkspaceLayout() {
     };
   }, [jobId, setJobId]);
 
+  useEffect(() => {
+    if (job?.logoUrl) {
+      preloadJobLogo(job.logoUrl);
+    }
+  }, [job?.logoUrl]);
+
   const lifecycle = job ? jobLifecycle(job) : { label: "Active", tone: "success" as const };
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const origin = useJobOrigin();
@@ -214,7 +220,7 @@ function JobWorkspaceLayout() {
 
         <div className="flex flex-col gap-3 px-4 pb-3 pt-3 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3">
-            <CompanyMark short={job.companyShort} tone={job.logoTone} size="lg" />
+            <CompanyMark short={job.companyShort} tone={job.logoTone} logoUrl={job.logoUrl} size="lg" />
             <div className="min-w-0">
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-medium text-foreground">
                 {job.company}

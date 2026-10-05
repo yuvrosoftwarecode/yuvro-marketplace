@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import {
   Building2,
   CalendarCheck,
@@ -10,6 +11,7 @@ import {
   CreditCard,
   FilePlus2,
   LayoutDashboard,
+  LogOut,
   Menu,
   Plug,
   Settings,
@@ -135,10 +137,12 @@ function NavRow({ item, collapsed }: { item: Item; collapsed: boolean }) {
 function CompanySidebar({
   collapsed,
   onToggle,
+  onSignOut,
   className,
 }: {
   collapsed: boolean;
   onToggle: () => void;
+  onSignOut?: () => void;
   className?: string;
 }) {
   const [unreadCount, setUnreadCount] = useState<number>(0);
@@ -220,7 +224,33 @@ function CompanySidebar({
         ))}
       </div>
 
-      <div className="border-t border-sidebar-border p-3 shrink-0">
+      <div className="border-t border-sidebar-border p-3 shrink-0 space-y-1">
+        {onSignOut ? (
+          collapsed ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={onSignOut}
+                  aria-label="Sign out"
+                  className="flex h-9 w-full items-center justify-center rounded-md text-[13px] font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <LogOut className="size-4 shrink-0" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Sign out</TooltipContent>
+            </Tooltip>
+          ) : (
+            <button
+              type="button"
+              onClick={onSignOut}
+              className="flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+            >
+              <LogOut className="size-4 shrink-0" />
+              <span>Sign out</span>
+            </button>
+          )
+        ) : null}
         <button
           type="button"
           onClick={onToggle}
@@ -250,11 +280,23 @@ export function CompanyShell({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const { isAuthenticated, isLoading, logout } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      navigate({ to: "/company/login" });
+    }
+  }, [isLoading, isAuthenticated, navigate]);
+
+  const handleSignOut = () => {
+    logout("/company/login");
+  };
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
       <div className="hidden h-full shrink-0 lg:block">
-        <CompanySidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
+        <CompanySidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} onSignOut={handleSignOut} />
       </div>
 
       <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
@@ -283,7 +325,7 @@ export function CompanyShell({
       <Sheet open={navOpen} onOpenChange={setNavOpen}>
         <SheetContent side="left" className="w-[252px] p-0">
           <SheetTitle className="sr-only">Company navigation</SheetTitle>
-          <CompanySidebar collapsed={false} onToggle={() => setNavOpen(false)} className="w-full border-r-0" />
+          <CompanySidebar collapsed={false} onToggle={() => setNavOpen(false)} onSignOut={handleSignOut} className="w-full border-r-0" />
         </SheetContent>
       </Sheet>
     </div>

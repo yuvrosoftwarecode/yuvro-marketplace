@@ -163,6 +163,26 @@ export function mapBackendJobToRecruiterJob(apiJob: Record<string, unknown>): Jo
     whyFit: recApp.why_fit ? String(recApp.why_fit) : undefined,
     company: companyName,
     companyShort,
+    logoUrl: (() => {
+      const rawLogo =
+        comp.logo_url ||
+        comp.logo ||
+        apiJob.company_logo ||
+        apiJob.company_logo_url ||
+        apiJob.logo_url ||
+        apiJob.logo;
+      if (typeof rawLogo === "string" && rawLogo.trim()) {
+        const trimmed = rawLogo.trim();
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("data:")) {
+          return trimmed;
+        }
+        const backendBase = (
+          import.meta.env.VITE_BACKEND_API_BASE_URL || "http://localhost:8004"
+        ).replace(/\/api\/?$/, "").replace(/\/$/, "");
+        return `${backendBase}${trimmed.startsWith("/") ? "" : "/"}${trimmed}`;
+      }
+      return undefined;
+    })(),
     logoTone,
     title: String(apiJob.title || "Job Title"),
     location: String(apiJob.location || "Remote"),
@@ -187,7 +207,16 @@ export function mapBackendJobToRecruiterJob(apiJob: Record<string, unknown>): Jo
     companySize: String(comp.company_size || "—"),
     fundingStage: String(comp.funding_stage || "—"),
     fundingAmount: String(comp.funding || "—"),
-    founded: apiJob.founded_year ? String(apiJob.founded_year) : "—",
+    founded: (() => {
+      const compFounded =
+        comp.founded_year ??
+        comp.founded ??
+        apiJob.founded_year ??
+        apiJob.founded;
+      return compFounded != null && String(compFounded).trim() !== "" && String(compFounded).trim() !== "—"
+        ? String(compFounded)
+        : "—";
+    })(),
     website: String(comp.website || ""),
     investors: Array.isArray(comp.investors) ? (comp.investors as string[]) : [],
     founders: Array.isArray(comp.leadership) && comp.leadership.length > 0

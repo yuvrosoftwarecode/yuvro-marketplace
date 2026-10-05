@@ -234,16 +234,25 @@ class AuthService {
     return await yhubApiAuthUtil.post<User>("/auth/profile/remove-image/", { field });
   }
 
-  async logoutUser(): Promise<void> {
+  async logoutUser(redirectUrl: string = "/"): Promise<void> {
     const refreshToken = localStorage.getItem("refresh") || localStorage.getItem("refresh_token");
     if (refreshToken) {
-      yhubApiUtil.post("/auth/logout/", { refresh: refreshToken }).catch((error) => {
+      try {
+        await yhubApiUtil.post("/auth/logout/", { refresh: refreshToken }).catch((error) => {
+          console.warn("Logout error:", error);
+        });
+      } catch (error) {
         console.warn("Logout error:", error);
-      });
+      }
     }
-    restApiAuthUtil.clearAuthToken();
-    yhubApiAuthUtil.clearAuthToken();
-    window.location.href = "/";
+    this.clearTokens();
+    if (redirectUrl && typeof window !== "undefined") {
+      window.location.href = redirectUrl;
+    }
+  }
+
+  async logout(redirectUrl: string = "/company/login"): Promise<void> {
+    return this.logoutUser(redirectUrl);
   }
 
   async sendResetPasswordOTP(email: string): Promise<any> {

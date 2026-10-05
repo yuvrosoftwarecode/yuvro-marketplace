@@ -89,7 +89,7 @@ type AuthAction =
 
 export interface AuthContextType extends AuthState {
   login: (user: User, token: string) => void;
-  logout: () => void;
+  logout: (redirectUrl?: string) => void;
   updateUser: (user: User) => void;
   isAccountManager: boolean;
   isFreelancer: boolean;
@@ -269,9 +269,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => {
+  const logout = (redirectUrl: string = "/") => {
     localStorage.removeItem("user");
-    authService.logoutUser();
+    authService.logoutUser(redirectUrl);
     dispatch({ type: "LOGOUT" });
   };
 
