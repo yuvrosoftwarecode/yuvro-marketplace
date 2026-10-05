@@ -218,7 +218,7 @@ CORS_ALLOWED_ORIGINS = config(
 )
 CSRF_TRUSTED_ORIGINS = config(
     "CSRF_TRUSTED_ORIGINS",
-    default="http://localhost:3004,http://127.0.0.1:3004,https://marketplace.yuvro.ai,https://backend-marketplace.yuvro.ai",
+    default="http://localhost:3004,http://127.0.0.1:3004,https://marketplace.yuvro.ai,https://marketplace-dev.yuvro.ai,https://backend-marketplace.yuvro.ai,https://backend-marketplace-dev.yuvro.ai",
     cast=Csv(),
 )
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
