@@ -822,6 +822,16 @@ class RecruiterSerializer(serializers.ModelSerializer):
 
 
 class RecruiterApplicationSerializer(serializers.ModelSerializer):
+    linkedin = serializers.CharField(
+        required=True,
+        allow_blank=False,
+        max_length=500,
+        error_messages={
+            "required": "LinkedIn profile URL is required.",
+            "blank": "LinkedIn profile URL cannot be empty.",
+        },
+    )
+
     class Meta:
         model = RecruiterApplication
         fields = [
@@ -853,6 +863,54 @@ class RecruiterApplicationSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+    def validate_linkedin(self, value):
+        if not value or not str(value).strip():
+            raise serializers.ValidationError("LinkedIn profile URL is required.")
+        trimmed = str(value).strip()
+        import re
+
+        pattern = re.compile(
+            r"^(?:https?:\/\/)?(?:[a-z]{2,3}\.)?(?:www\.)?linkedin\.com\/in\/([a-zA-Z0-9_\-%]+)",
+            re.IGNORECASE,
+        )
+        match = pattern.match(trimmed)
+        if not match:
+            raise serializers.ValidationError(
+                "Please enter a valid LinkedIn profile URL (e.g. https://www.linkedin.com/in/username)."
+            )
+
+        handle = match.group(1).lower().rstrip("/")
+        user = self.context.get("request").user if self.context.get("request") else None
+
+        from recruiting.services import normalize_linkedin_url
+        norm_input = normalize_linkedin_url(trimmed)
+
+        recruiter_qs = Recruiter.objects.exclude(linkedin__isnull=True).exclude(linkedin="")
+        app_qs = RecruiterApplication.objects.exclude(linkedin__isnull=True).exclude(linkedin="")
+
+        if user and user.is_authenticated:
+            recruiter_qs = recruiter_qs.exclude(user=user).exclude(email__iexact=user.email)
+            app_qs = app_qs.exclude(user=user).exclude(email__iexact=user.email)
+
+        exists = False
+        for rec in recruiter_qs.only("linkedin"):
+            if normalize_linkedin_url(rec.linkedin) == norm_input:
+                exists = True
+                break
+
+        if not exists:
+            for app in app_qs.only("linkedin"):
+                if normalize_linkedin_url(app.linkedin) == norm_input:
+                    exists = True
+                    break
+
+        if exists:
+            raise serializers.ValidationError(
+                "A recruiter with this LinkedIn profile already exists."
+            )
+
+        return trimmed
 
     def validate_hiring_references(self, value):
         if not isinstance(value, list):

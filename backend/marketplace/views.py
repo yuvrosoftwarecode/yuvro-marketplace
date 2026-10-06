@@ -882,6 +882,88 @@ class RecruiterApplicationViewSet(viewsets.ModelViewSet):
     serializer_class = RecruiterApplicationSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_permissions(self):
+        if self.action in ["check_linkedin"]:
+            return [permissions.AllowAny()]
+        return super().get_permissions()
+
+    @action(
+        detail=False,
+        methods=["get", "post"],
+        url_path="check-linkedin",
+        permission_classes=[permissions.AllowAny],
+    )
+    def check_linkedin(self, request):
+        import re
+
+        raw_url = (
+            request.data.get("linkedin")
+            if request.method == "POST"
+            else request.query_params.get("linkedin")
+        ) or ""
+        trimmed = str(raw_url).strip()
+        if not trimmed:
+            return Response(
+                {"is_duplicate": False, "exists": False, "message": ""},
+                status=status.HTTP_200_OK,
+            )
+
+        pattern = re.compile(
+            r"^(?:https?:\/\/)?(?:[a-z]{2,3}\.)?(?:www\.)?linkedin\.com\/in\/([a-zA-Z0-9_\-%]+)",
+            re.IGNORECASE,
+        )
+        match = pattern.match(trimmed)
+        if not match:
+            return Response(
+                {
+                    "is_duplicate": False,
+                    "exists": False,
+                    "is_valid": False,
+                    "message": "Please enter a valid LinkedIn profile URL (e.g. https://www.linkedin.com/in/username).",
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        handle = match.group(1).lower().rstrip("/")
+        user = request.user if request.user and request.user.is_authenticated else None
+
+        from recruiting.services import normalize_linkedin_url
+        norm_input = normalize_linkedin_url(trimmed)
+
+        recruiter_qs = Recruiter.objects.exclude(linkedin__isnull=True).exclude(linkedin="")
+        app_qs = RecruiterApplication.objects.exclude(linkedin__isnull=True).exclude(linkedin="")
+
+        if user:
+            recruiter_qs = recruiter_qs.exclude(user=user).exclude(email__iexact=user.email)
+            app_qs = app_qs.exclude(user=user).exclude(email__iexact=user.email)
+
+        exists = False
+        for rec in recruiter_qs.only("linkedin"):
+            if normalize_linkedin_url(rec.linkedin) == norm_input:
+                exists = True
+                break
+
+        if not exists:
+            for app in app_qs.only("linkedin"):
+                if normalize_linkedin_url(app.linkedin) == norm_input:
+                    exists = True
+                    break
+
+        return Response(
+            {
+                "is_duplicate": exists,
+                "exists": exists,
+                "is_valid": True,
+                "handle": handle,
+                "message": (
+                    "A recruiter with this LinkedIn profile already exists."
+                    if exists
+                    else ""
+                ),
+            },
+            status=status.HTTP_200_OK,
+        )
+
     def get_queryset(self):
         user = self.request.user
         qs = super().get_queryset()

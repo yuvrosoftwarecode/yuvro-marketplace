@@ -69,6 +69,7 @@ export type ApplicationDraft = {
   phoneCountryCode: string;
   phoneCountryIso: string;
   phoneNumber: string;
+  linkedin: string;
   years: string;
   startup: "" | "yes" | "no";
   startupDetail: string;
@@ -86,6 +87,7 @@ export const emptyDraft = (): ApplicationDraft => ({
   phoneCountryCode: "+1",
   phoneCountryIso: "US",
   phoneNumber: "",
+  linkedin: "",
   years: "",
   startup: "",
   startupDetail: "",
@@ -107,6 +109,11 @@ function read<T>(k: string, fb: T): T {
 
 export const getDraft = (): ApplicationDraft => {
   const d = { ...emptyDraft(), ...read<Partial<ApplicationDraft>>(APP, {}) };
+  if (!d.linkedin && typeof window !== "undefined") {
+    try {
+      d.linkedin = sessionStorage.getItem("signup_linkedin") || "";
+    } catch {}
+  }
   // Migrate legacy single phone string into country code and number
   if (!d.phoneNumber && d.phone) {
     const raw = d.phone.trim();

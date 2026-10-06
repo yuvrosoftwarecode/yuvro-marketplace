@@ -89,10 +89,70 @@ function ApplicationPage() {
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
 
+  // Instant LinkedIn duplicate checking states
+  const [linkedinFieldChecking, setLinkedinFieldChecking] = useState(false);
+  const [linkedinFieldError, setLinkedinFieldError] = useState<string | null>(null);
+  const [linkedinFieldValid, setLinkedinFieldValid] = useState(false);
+
   const isApproved = user?.is_active === true;
   const isPending =
     user?.is_active === false &&
     (user?.is_applied || getStatus() === "pending_review");
+
+  // Real-time duplicate check for recruiter LinkedIn
+  const checkRecruiterLinkedinLive = async (rawUrl: string) => {
+    const trimmed = rawUrl.trim();
+    if (!trimmed) {
+      setLinkedinFieldError(null);
+      setLinkedinFieldValid(false);
+      setLinkedinFieldChecking(false);
+      return;
+    }
+
+    const handle = extractLinkedInHandle(trimmed);
+    if (!handle) {
+      setLinkedinFieldError("Only LinkedIn profile URLs (e.g. linkedin.com/in/username) are accepted.");
+      setLinkedinFieldValid(false);
+      setLinkedinFieldChecking(false);
+      return;
+    }
+
+    setLinkedinFieldChecking(true);
+    setLinkedinFieldError(null);
+    try {
+      const res = await api.get<{ is_duplicate?: boolean; message?: string }>(
+        `/api/marketplace/recruiter-applications/check-linkedin/?linkedin=${encodeURIComponent(trimmed)}`
+      );
+      if (res?.is_duplicate) {
+        setLinkedinFieldError(res.message || "A recruiter with this LinkedIn profile already exists.");
+        setLinkedinFieldValid(false);
+      } else {
+        setLinkedinFieldError(null);
+        setLinkedinFieldValid(true);
+      }
+    } catch {
+      setLinkedinFieldError(null);
+    } finally {
+      setLinkedinFieldChecking(false);
+    }
+  };
+
+  // Real-time debounced check as soon as user enters recruiter LinkedIn URL
+  useEffect(() => {
+    const trimmed = d.linkedin?.trim() || "";
+    if (!trimmed) {
+      setLinkedinFieldError(null);
+      setLinkedinFieldValid(false);
+      setLinkedinFieldChecking(false);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      checkRecruiterLinkedinLive(trimmed);
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [d.linkedin]);
 
   // Load existing application draft or status
   const checkApplicationStatus = async (manual = false) => {
@@ -164,15 +224,21 @@ function ApplicationPage() {
     [q, d.countries],
   );
 
-  const recruiterLinkedin = useMemo(() => {
-    let link = user?.roles?.linkedin || (user as any)?.linkedin || "";
-    if (!link && typeof window !== "undefined") {
-      try {
-        link = sessionStorage.getItem("signup_linkedin") || "";
-      } catch {}
+  useEffect(() => {
+    if (!d.linkedin) {
+      let link = user?.roles?.linkedin || (user as any)?.linkedin || "";
+      if (!link && typeof window !== "undefined") {
+        try {
+          link = sessionStorage.getItem("signup_linkedin") || "";
+        } catch {}
+      }
+      if (link) {
+        set({ linkedin: link });
+      }
     }
-    return link;
-  }, [user]);
+  }, [user, d.linkedin]);
+
+  const recruiterLinkedin = d.linkedin?.trim() || "";
 
   const recruiterHandle = useMemo(() => {
     return recruiterLinkedin ? extractLinkedInHandle(recruiterLinkedin) : null;
@@ -316,6 +382,15 @@ function ApplicationPage() {
       if (!d.phoneNumber.trim() || d.phoneNumber.replace(/\D/g, "").length < 5) {
         return "Enter a valid phone number.";
       }
+      if (!d.linkedin || !d.linkedin.trim()) {
+        return "LinkedIn profile URL is required.";
+      }
+      if (!extractLinkedInHandle(d.linkedin.trim())) {
+        return "Please enter a valid LinkedIn profile URL (e.g. https://www.linkedin.com/in/username).";
+      }
+      if (linkedinFieldError) {
+        return linkedinFieldError;
+      }
       if (!d.years) {
         return "Select your years of recruitment experience.";
       }
@@ -391,6 +466,24 @@ function ApplicationPage() {
     setError(err);
     if (err) return;
 
+    if (step === 0) {
+      // Check duplicate recruiter LinkedIn with backend
+      try {
+        setChecking(true);
+        const res = await api.get<{ is_duplicate?: boolean; message?: string }>(
+          `/api/marketplace/recruiter-applications/check-linkedin/?linkedin=${encodeURIComponent(d.linkedin.trim())}`
+        );
+        if (res?.is_duplicate) {
+          setError(res.message || "A recruiter with this LinkedIn profile already exists.");
+          return;
+        }
+      } catch (e: any) {
+        console.warn("LinkedIn duplicate check error:", e);
+      } finally {
+        setChecking(false);
+      }
+    }
+
     if (step < 2) {
       setStep(step + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -427,8 +520,13 @@ function ApplicationPage() {
       }
       toast.success("Application submitted successfully!");
     } catch (apiErr: any) {
+      const fieldMsg =
+        apiErr?.linkedin?.[0] ||
+        apiErr?.data?.linkedin?.[0] ||
+        apiErr?.response?.data?.linkedin?.[0];
       setError(
-        apiErr?.message ||
+        fieldMsg ||
+          apiErr?.message ||
           apiErr?.detail ||
           "Failed to submit application. Please try again.",
       );
@@ -510,6 +608,53 @@ function ApplicationPage() {
                   className="h-10 flex-1"
                 />
               </div>
+            </Q>
+            <Q
+              label="LinkedIn profile URL *"
+              hint="Your personal LinkedIn profile link (e.g. https://www.linkedin.com/in/username)"
+            >
+              <div className="relative">
+                <Input
+                  type="url"
+                  value={d.linkedin}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    set({ linkedin: val });
+                    setLinkedinFieldValid(false);
+                    if (linkedinFieldError) setLinkedinFieldError(null);
+                    if (error) setError(null);
+                  }}
+                  onBlur={() => {
+                    if (d.linkedin?.trim()) {
+                      checkRecruiterLinkedinLive(d.linkedin);
+                    }
+                  }}
+                  placeholder="https://www.linkedin.com/in/your-profile"
+                  className={`h-10 pr-9 ${
+                    linkedinFieldError
+                      ? "border-destructive focus-visible:ring-destructive/30"
+                      : linkedinFieldValid
+                      ? "border-emerald-500 focus-visible:ring-emerald-500/30"
+                      : ""
+                  }`}
+                />
+                {linkedinFieldChecking ? (
+                  <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                    <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                  </div>
+                ) : linkedinFieldValid ? (
+                  <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-emerald-600">
+                    <svg className="size-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                ) : null}
+              </div>
+              {linkedinFieldError ? (
+                <p className="mt-1 text-[12px] font-medium text-destructive">
+                  {linkedinFieldError}
+                </p>
+              ) : null}
             </Q>
             <Q
               label="Recruitment experience *"

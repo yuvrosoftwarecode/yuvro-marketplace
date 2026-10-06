@@ -156,7 +156,6 @@ function SubmitTab() {
   const [form, setForm] = useState<Form>(empty);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [consent, setConsent] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [backendDuplicateMatch, setBackendDuplicateMatch] = useState<{
@@ -812,34 +811,23 @@ function SubmitTab() {
             </div>
           </div>
           <div className="border-t border-border p-3">
-            <div className="mb-3 flex items-start gap-2 text-xs leading-5 text-muted-foreground">
-              <input
-                id="submission-consent"
-                type="checkbox"
-                checked={consent}
-                onChange={(e) => setConsent(e.target.checked)}
-                className="mt-0.5 size-4 shrink-0 accent-[var(--brand)] cursor-pointer"
-              />
-              <div className="flex-1">
-                <label htmlFor="submission-consent" className="cursor-pointer select-none">
-                  I confirm that the candidate has been contacted and agreed to apply for this role, and I accept the{" "}
-                </label>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setTermsOpen(true);
-                  }}
-                  className="font-semibold text-brand underline-offset-2 hover:underline inline p-0 bg-transparent border-0 cursor-pointer align-baseline"
-                >
-                  Terms &amp; Conditions
-                </button>.
-              </div>
-            </div>
+            <p className="mb-3 text-xs leading-5 text-muted-foreground">
+              By submitting, you confirm that the candidate has been contacted and agreed to apply for this role, and you accept the{" "}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setTermsOpen(true);
+                }}
+                className="font-semibold text-brand underline-offset-2 hover:underline inline p-0 bg-transparent border-0 cursor-pointer align-baseline"
+              >
+                Terms &amp; Conditions
+              </button>.
+            </p>
             <button
               type="button"
-              disabled={!canSubmit || !consent || isSubmitting || Boolean(duplicateLinkedinMatch)}
+              disabled={!canSubmit || isSubmitting || Boolean(duplicateLinkedinMatch)}
               onClick={handleSubmit}
               className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-brand text-[13px] font-semibold text-brand-foreground hover:bg-brand/90 disabled:opacity-50 transition-colors shadow-sm"
             >
