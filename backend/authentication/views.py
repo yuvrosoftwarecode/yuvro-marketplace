@@ -321,8 +321,8 @@ def sync_shadow_user(request):
         "role": local_role,
         "profile_image": profile_image,
         "is_active": is_active,
-        "is_staff": (local_role == "admin"),
-        "is_superuser": (local_role == "admin"),
+        "is_staff": bool(local_role in ["admin", User.Role.RECRUITER_ACCOUNT_MANAGER] or data.get("is_staff", False)),
+        "is_superuser": bool(local_role == "admin" or data.get("is_superuser", False)),
     }
 
     existing_user = User.objects.filter(email=email).first()
