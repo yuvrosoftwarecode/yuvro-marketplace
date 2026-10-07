@@ -96,8 +96,7 @@ function AmCreateJobPage() {
     salaryMin: "150000",
     salaryMax: "195000",
     salaryCurrency: "USD",
-    equityMin: "0.05",
-    equityMax: "0.12",
+    equity: "0.10",
     companyToYuvroPct: "20",
     yuvroCommissionPct: "5",
     recruiterSlots: "6",
@@ -202,18 +201,9 @@ function AmCreateJobPage() {
         return false;
       }
 
-      const eqMin = parseFloat(form.equityMin);
-      if (!form.equityMin.trim() || isNaN(eqMin) || eqMin < 0) {
-        toast.error("Equity minimum is required (enter 0 if none).");
-        return false;
-      }
-      const eqMax = parseFloat(form.equityMax);
-      if (!form.equityMax.trim() || isNaN(eqMax) || eqMax < 0) {
-        toast.error("Equity maximum is required.");
-        return false;
-      }
-      if (eqMin > eqMax) {
-        toast.error("Minimum equity % cannot be greater than maximum equity %.");
+      const eq = parseFloat(form.equity);
+      if (!form.equity.trim() || isNaN(eq) || eq < 0) {
+        toast.error("Equity % is required (enter 0 if none).");
         return false;
       }
 
@@ -326,8 +316,7 @@ function AmCreateJobPage() {
       }
     }
 
-    const eqMin = form.equityMin.trim() ? parseFloat(form.equityMin) : null;
-    const eqMax = form.equityMax.trim() ? parseFloat(form.equityMax) : null;
+    const eq = form.equity.trim() ? parseFloat(form.equity) : null;
 
     const parsedPayoutTerms = form.payoutTerms
       .split(",")
@@ -350,7 +339,7 @@ function AmCreateJobPage() {
       employmentTypes.find((e) => e.value === form.employmentType)?.label || "Full-time";
     const workModelLabel =
       (workModels.find((w) => w.value === form.workModel)?.label as
-        "Remote" | "Hybrid" | "Onsite") || "Hybrid";
+        "Remote" | "Hybrid" | "Onsite" | "On-site") || "Hybrid";
 
     const id = `JOB-${Math.floor(1000 + Math.random() * 8999)}`;
     const jobPayload: AmJob = {
@@ -366,9 +355,8 @@ function AmCreateJobPage() {
       salaryMin: salaryMinNum,
       salaryMax: salaryMaxNum,
       currency: form.salaryCurrency as "USD" | "GBP" | "EUR",
-      equity: eqMin !== null && eqMax !== null ? `${eqMin}% – ${eqMax}%` : "—",
-      equityMin: eqMin,
-      equityMax: eqMax,
+      equity: eq !== null ? `${eq}%` : "—",
+      equityValue: eq,
       bonus: "—",
       compNotes: "",
       status,
@@ -594,30 +582,18 @@ function AmCreateJobPage() {
               </select>
             </Field>
 
-            <div className="grid grid-cols-2 gap-2">
-              <Field label="Equity min (%) *" hint="e.g. 0.05">
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  className={inputCls}
-                  value={form.equityMin}
-                  onChange={(e) => set("equityMin", e.target.value)}
-                  placeholder="0.05"
-                />
-              </Field>
-              <Field label="Equity max (%) *" hint="e.g. 0.12">
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  className={inputCls}
-                  value={form.equityMax}
-                  onChange={(e) => set("equityMax", e.target.value)}
-                  placeholder="0.12"
-                />
-              </Field>
-            </div>
+            <Field label="Equity (%) *" hint="e.g. 0.10">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                className={inputCls}
+                value={form.equity}
+                onChange={(e) => set("equity", e.target.value)}
+                placeholder="0.10"
+              />
+            </Field>
 
             <Field
               label="Company to Yuvro fee (%) *"

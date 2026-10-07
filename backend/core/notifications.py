@@ -1,4 +1,6 @@
+import json
 import logging
+from decimal import Decimal
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from core.models import Notification
@@ -344,6 +346,227 @@ def notify_recruiter_pipeline_moved(
     except Exception as e:
         logger.exception(f"Error notifying recruiter of pipeline move: {e}")
         return None
+
+
+TRACKED_JOB_FIELDS = [
+    "title",
+    "status",
+    "location",
+    "employment_type",
+    "work_model",
+    "experience",
+    "open_roles",
+    "recruiter_slots",
+    "job_description",
+    "salary_min",
+    "salary_max",
+    "salary_currency",
+    "equity",
+    "visa_sponsorship",
+    "benefits_and_perks",
+    "company_to_yuvro_percentage",
+    "yuvro_commission_percentage",
+    "payout_terms",
+    "candidate_questions",
+    "must_haves",
+    "signals",
+    "hiring_process",
+    "target_companies",
+]
+
+DECIMAL_FIELDS = {
+    "salary_min",
+    "salary_max",
+    "equity",
+    "company_to_yuvro_percentage",
+    "yuvro_commission_percentage",
+}
+
+INT_FIELDS = {
+    "open_roles",
+    "recruiter_slots",
+}
+
+JSON_FIELDS = {
+    "payout_terms",
+    "candidate_questions",
+    "must_haves",
+    "signals",
+    "hiring_process",
+    "target_companies",
+}
+
+
+def normalize_decimal(val):
+    if val is None or str(val).strip() == "":
+        return None
+    try:
+        return Decimal(str(val))
+    except Exception:
+        return val
+
+
+def normalize_int(val):
+    if val is None or str(val).strip() == "":
+        return None
+    try:
+        return int(val)
+    except Exception:
+        return val
+
+
+def normalize_json(val, is_dict: bool = False):
+    if val is None or val == "":
+        return {} if is_dict else []
+    if isinstance(val, str):
+        try:
+            val = json.loads(val)
+        except Exception:
+            return val
+    return val
+
+
+def are_job_field_values_equal(field: str, v1, v2) -> bool:
+    if field in DECIMAL_FIELDS:
+        return normalize_decimal(v1) == normalize_decimal(v2)
+    if field in INT_FIELDS:
+        return normalize_int(v1) == normalize_int(v2)
+    if field in JSON_FIELDS:
+        is_dict = (field == "signals")
+        return normalize_json(v1, is_dict=is_dict) == normalize_json(v2, is_dict=is_dict)
+    # Text / Char fields
+    return str(v1 or "").strip() == str(v2 or "").strip()
+
+
+def get_job_changed_fields(old_job, new_job) -> list[str]:
+    """
+    Compares tracked fields between old_job and new_job.
+    Returns a list of field names that actually changed.
+    Both old_job and new_job can be either a Job instance or a dict of field values.
+    """
+    if old_job is None or new_job is None:
+        return []
+
+    if old_job is new_job and not isinstance(old_job, dict):
+        return []
+
+    changed = []
+    for field in TRACKED_JOB_FIELDS:
+        if isinstance(old_job, dict) and field not in old_job:
+            continue
+        if isinstance(new_job, dict) and field not in new_job:
+            continue
+
+        v1 = old_job[field] if isinstance(old_job, dict) else getattr(old_job, field, None)
+        v2 = new_job[field] if isinstance(new_job, dict) else getattr(new_job, field, None)
+
+        if not are_job_field_values_equal(field, v1, v2):
+            changed.append(field)
+
+    return changed
+
+
+def notify_recruiters_job_updated(
+    job,
+    updated_by=None,
+    old_instance=None,
+    changed_fields: list[str] | None = None,
+) -> list[Notification]:
+    """
+    Recruiter Trigger: when an Account Manager changes a job.
+    Triggers an in-app notification to all active recruiters on the platform
+    as well as any recruiters who applied to or are working on the job.
+    Suppressed if no tracked fields changed.
+    """
+    if changed_fields is not None:
+        if not changed_fields:
+            return []
+    elif old_instance is not None:
+        computed_changed = get_job_changed_fields(old_instance, job)
+        if not computed_changed:
+            return []
+        changed_fields = computed_changed
+
+    notifications = []
+    try:
+        from marketplace.models import JobStatus, Recruiter, RecruiterStatus
+        from recruiting.models import RecruiterJobApplication
+
+        User = get_user_model()
+        recipients = set()
+
+        # 1. All active freelancer recruiters
+        for u in User.objects.filter(role=User.Role.RECRUITER_FREELANCER, is_active=True):
+            recipients.add(u)
+
+        # 2. All recruiters in marketplace_recruiters table
+        for r in Recruiter.objects.filter(status=RecruiterStatus.ACTIVE).select_related("user"):
+            if r.user and r.user.is_active:
+                recipients.add(r.user)
+
+        # 3. Any recruiter who applied to this specific job
+        if job:
+            for app in RecruiterJobApplication.objects.filter(job=job).select_related("recruiter"):
+                if app.recruiter and app.recruiter.is_active:
+                    recipients.add(app.recruiter)
+
+        # Don't notify the user who made the update
+        if updated_by and getattr(updated_by, "id", None):
+            recipients = {u for u in recipients if str(u.id) != str(updated_by.id)}
+
+        if not recipients:
+            return []
+
+        job_title = getattr(job, "title", "Open Role")
+        company = getattr(job, "company", None)
+        company_name = getattr(company, "name", "Client") if company else "Client"
+        job_status = getattr(job, "status", "")
+
+        old_status = (
+            old_instance.get("status")
+            if isinstance(old_instance, dict)
+            else getattr(old_instance, "status", None)
+        ) if old_instance else None
+
+        if job_status == JobStatus.PAUSED and old_status != JobStatus.PAUSED:
+            title = f"Job Paused: {job_title}"
+            body = f"Hiring for {job_title} at {company_name} has been paused."
+        elif job_status == JobStatus.CLOSED and old_status != JobStatus.CLOSED:
+            title = f"Job Closed: {job_title}"
+            body = f"{job_title} at {company_name} has been closed."
+        elif job_status == JobStatus.ACTIVE and old_status in [JobStatus.DRAFT, JobStatus.PENDING_APPROVAL]:
+            title = f"New Job Available: {job_title}"
+            body = f"{job_title} at {company_name} is now open for candidate submissions."
+        else:
+            title = f"Job Updated: {job_title}"
+            body = f"{job_title} at {company_name} was updated by the Account Manager. Review the latest requirements and details."
+
+        link = f"/jobs/{job.slug or job.id}" if job else "/jobs"
+        data = {
+            "jobId": str(job.id) if job else "",
+            "jobTitle": job_title,
+            "companyName": company_name,
+            "status": job_status,
+            "type": "job_updated",
+            "changedFields": changed_fields or [],
+        }
+
+        for recruiter in recipients:
+            notif = create_notification(
+                recipient=recruiter,
+                title=title,
+                body=body,
+                category=Notification.Category.JOBS,
+                notification_type="job_updated",
+                link=link,
+                data=data,
+            )
+            if notif:
+                notifications.append(notif)
+    except Exception as e:
+        logger.exception(f"Error notifying recruiters of job update: {e}")
+
+    return notifications
 
 
 # ---------------------------------------------------------------------------

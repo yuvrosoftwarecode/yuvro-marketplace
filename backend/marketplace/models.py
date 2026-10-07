@@ -238,19 +238,12 @@ class Job(BaseModel):
     )
     salary_currency = models.CharField(max_length=10, default="USD")
 
-    equity_min = models.DecimalField(
+    equity = models.DecimalField(
         max_digits=6,
         decimal_places=3,
         null=True,
         blank=True,
-        help_text="Minimum equity percentage (e.g., 0.150 for 0.15%).",
-    )
-    equity_max = models.DecimalField(
-        max_digits=6,
-        decimal_places=3,
-        null=True,
-        blank=True,
-        help_text="Maximum equity percentage (e.g., 0.400 for 0.40%).",
+        help_text="Equity percentage (e.g., 0.100 for 0.10%).",
     )
     visa_sponsorship = models.CharField(max_length=255, blank=True, default="")
 
@@ -361,6 +354,9 @@ class Job(BaseModel):
             raise ValidationError(
                 {"salary_min": "Salary minimum cannot exceed salary maximum."}
             )
+
+        if self.equity is not None and self.equity < Decimal("0.00"):
+            raise ValidationError({"equity": "Equity percentage cannot be negative."})
 
         if self.company_to_yuvro_percentage < Decimal("0.00"):
             raise ValidationError(

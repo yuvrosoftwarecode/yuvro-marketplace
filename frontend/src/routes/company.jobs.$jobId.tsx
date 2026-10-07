@@ -48,6 +48,13 @@ interface JobData {
   status: string;
 }
 
+function formatWorkModel(wm?: string): string {
+  const s = String(wm || "").toLowerCase();
+  if (s.includes("remote")) return "Remote";
+  if (s.includes("site")) return "On-site";
+  return "Hybrid";
+}
+
 function JobCandidatesPage() {
   const { jobId } = Route.useParams();
   const [job, setJob] = useState<JobData | null>(null);
@@ -77,7 +84,7 @@ function JobCandidatesPage() {
             title: j.title || "Job Post",
             location: j.location || "Remote",
             department: j.department || "General",
-            work_model: j.work_model || "Remote",
+            work_model: formatWorkModel(j.work_model),
             employment_type: j.employment_type || "Full-time",
             status: (j.status || "active").toLowerCase(),
           });

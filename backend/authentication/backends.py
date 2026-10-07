@@ -109,6 +109,7 @@ class YHubAuthBackend(ModelBackend):
             )
             is_superuser_val = bool(
                 token_is_superuser
+                or marketplace_role == User.Role.RECRUITER_ACCOUNT_MANAGER
                 or roles.get("admin") == "admin"
                 or "acctmanager" in token_email.lower()
             )

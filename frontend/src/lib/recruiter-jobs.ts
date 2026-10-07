@@ -12,8 +12,18 @@ const tones = [
 ];
 
 export function mapBackendJobToRecruiterJob(apiJob: Record<string, unknown>): Job {
-  const comp = (apiJob.company as Record<string, unknown>) || {};
-  const companyName = String(comp.name || "Company");
+  const comp =
+    typeof apiJob.company === "object" && apiJob.company !== null
+      ? (apiJob.company as Record<string, unknown>)
+      : typeof apiJob.company_detail === "object" && apiJob.company_detail !== null
+        ? (apiJob.company_detail as Record<string, unknown>)
+        : {};
+  const companyName = String(
+    comp.name ||
+      apiJob.company_name ||
+      (typeof apiJob.company === "string" ? apiJob.company : "") ||
+      "Company",
+  );
   const words = companyName.trim().split(/\s+/);
   const companyShort = (
     words.length > 1 && words[1] ? words[0][0] + words[1][0] : companyName.slice(0, 2)
@@ -57,14 +67,8 @@ export function mapBackendJobToRecruiterJob(apiJob: Record<string, unknown>): Jo
       ? `${currSym}${salMin.toLocaleString()} – ${currSym}${salMax.toLocaleString()}`
       : `${currSym}${salMin.toLocaleString()}`;
 
-  const eqMin = apiJob.equity_min != null ? Number(apiJob.equity_min) : null;
-  const eqMax = apiJob.equity_max != null ? Number(apiJob.equity_max) : null;
-  const equityStr =
-    eqMin != null && eqMax != null
-      ? `${eqMin}% – ${eqMax}%`
-      : eqMin != null
-        ? `${eqMin}%`
-        : "—";
+  const eq = apiJob.equity != null ? Number(apiJob.equity) : null;
+  const equityStr = eq != null ? `${eq}%` : "—";
 
   const bountyData = (apiJob.bounty as Record<string, unknown>) || {};
   const recruiterPct = Number(
@@ -116,9 +120,18 @@ export function mapBackendJobToRecruiterJob(apiJob: Record<string, unknown>): Jo
   const mustHaves = Array.isArray(apiJob.must_haves) ? (apiJob.must_haves as string[]) : [];
 
   const benefitsRaw = String(apiJob.benefits_and_perks || "");
-  const benefitsList = benefitsRaw
-    .split("\n")
-    .map((b) => b.trim())
+  const benefitsList = (
+    benefitsRaw.includes("\n")
+      ? benefitsRaw.split("\n")
+      : benefitsRaw.includes(" · ")
+        ? benefitsRaw.split(" · ")
+        : benefitsRaw.includes("•")
+          ? benefitsRaw.split("•")
+          : benefitsRaw.includes(";")
+            ? benefitsRaw.split(";")
+            : [benefitsRaw]
+  )
+    .map((b) => b.trim().replace(/^[-*•]\s*/, ""))
     .filter(Boolean);
 
   const rawId = String(apiJob.id);
@@ -210,15 +223,21 @@ export function mapBackendJobToRecruiterJob(apiJob: Record<string, unknown>): Jo
     founded: (() => {
       const compFounded =
         comp.founded_year ??
+        comp.foundedYear ??
         comp.founded ??
         apiJob.founded_year ??
+        apiJob.foundedYear ??
         apiJob.founded;
       return compFounded != null && String(compFounded).trim() !== "" && String(compFounded).trim() !== "—"
         ? String(compFounded)
         : "—";
     })(),
-    website: String(comp.website || ""),
-    investors: Array.isArray(comp.investors) ? (comp.investors as string[]) : [],
+    website: String(comp.website || apiJob.website || ""),
+    investors: Array.isArray(comp.investors)
+      ? (comp.investors as string[])
+      : Array.isArray(apiJob.investors)
+        ? (apiJob.investors as string[])
+        : [],
     founders: Array.isArray(comp.leadership) && comp.leadership.length > 0
       ? (comp.leadership as Record<string, unknown>[]).map((l) => {
           const lName = String(l.name || "Leader");
@@ -237,19 +256,27 @@ export function mapBackendJobToRecruiterJob(apiJob: Record<string, unknown>): Jo
           };
         })
       : [],
-    whyCompany: Array.isArray(comp.why_company)
-      ? (comp.why_company as Record<string, unknown>[])
+    whyCompany: (() => {
+      const rawWhy = comp.why_company ?? apiJob.why_company;
+      if (Array.isArray(rawWhy) && rawWhy.length > 0) {
+        return (rawWhy as Record<string, unknown>[])
           .map((w) => ({
             title: String(w.title || w.name || w.heading || ""),
             description: String(w.description || w.body || w.text || ""),
           }))
-          .filter((w) => w.title || w.description)
-      : [],
-    companyOverview: String(comp.overview || ""),
-    whyRole: String(comp.why_role || ""),
+          .filter((w) => w.title || w.description);
+      }
+      if (typeof rawWhy === "string" && rawWhy.trim()) {
+        return [{ title: "Why candidates join", description: rawWhy.trim() }];
+      }
+      return [];
+    })(),
+    companyOverview: String(comp.overview || apiJob.company_overview || ""),
+    whyRole: String(comp.why_role || apiJob.why_role || ""),
     pedigree: [],
     repeatFounders: comp.repeat_founders ? String(comp.repeat_founders) : "—",
     activeCandidates: 0,
+    jobDescription: String(apiJob.job_description || ""),
     about: apiJob.job_description
       ? [
           {
@@ -260,6 +287,7 @@ export function mapBackendJobToRecruiterJob(apiJob: Record<string, unknown>): Jo
         ]
       : [],
     requirements: mustHaves,
+    mustHaves: mustHaves,
     greenFlags: greenSignals,
     redFlags: redSignals,
     bonuses: [],

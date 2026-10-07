@@ -59,7 +59,9 @@ export type Job = {
   repeatFounders: string;
   activeCandidates: number;
   about: { heading: string; body: string; defaultOpen?: boolean }[];
+  jobDescription?: string;
   requirements: string[];
+  mustHaves?: string[];
   greenFlags: string[];
   redFlags: string[];
   bonuses: { label: string; amount: string; qualification: string }[];

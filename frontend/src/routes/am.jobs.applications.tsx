@@ -56,8 +56,7 @@ export type JobApplicationRecord = {
   salary_min: number | string;
   salary_max: number | string;
   salary_currency: string;
-  equity_min?: number | string;
-  equity_max?: number | string;
+  equity?: number | string;
   company_to_yuvro_percentage: number | string;
   yuvro_commission_percentage: number | string;
   recruiter_percentage?: number | string;
@@ -90,6 +89,13 @@ export type JobApplicationRecord = {
     slug?: string;
   };
 };
+
+function formatWorkModel(wm?: string): string {
+  const s = String(wm || "").toLowerCase();
+  if (s.includes("remote")) return "Remote";
+  if (s.includes("site")) return "On-site";
+  return "Hybrid";
+}
 
 function AmJobApplicationsPage() {
   const am = useAm();
@@ -539,7 +545,7 @@ function AmJobApplicationsPage() {
                       <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1">
                           <Building2 className="size-3" />
-                          {job.location} · {job.work_model || "Hybrid"}
+                          {job.location} · {formatWorkModel(job.work_model)}
                         </span>
                         <span>•</span>
                         <span className="capitalize">{job.employment_type?.replace("_", " ") || "Full-time"}</span>

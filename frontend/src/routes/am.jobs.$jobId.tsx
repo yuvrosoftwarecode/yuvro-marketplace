@@ -163,11 +163,9 @@ function AmJobWorkspacePage() {
   }, [job?.experience, job?.yearsExperience]);
 
   const equityDisplay = useMemo(() => {
-    if (job?.equityMin != null && job?.equityMax != null) {
-      return `${job.equityMin}% – ${job.equityMax}%`;
-    }
+    if (job?.equityValue != null) return `${job.equityValue}%`;
     return job?.equity || "—";
-  }, [job?.equityMin, job?.equityMax, job?.equity]);
+  }, [job?.equityValue, job?.equity]);
 
   const tabs = useMemo(
     () => [
@@ -283,8 +281,8 @@ function AmJobWorkspacePage() {
             </div>
 
             {((job.jd.responsibilities && job.jd.responsibilities.length > 0) ||
-              (job.jd.requirements && job.jd.requirements.length > 0) ||
               (job.mustHave && job.mustHave.length > 0) ||
+              (job.jd.requirements && job.jd.requirements.length > 0) ||
               (job.signals?.green && job.signals.green.length > 0) ||
               (job.signals?.red && job.signals.red.length > 0)) ? (
               <div className="mt-6 grid gap-6 sm:grid-cols-2">
@@ -296,19 +294,14 @@ function AmJobWorkspacePage() {
                     </div>
                   </div>
                 ) : null}
-                {job.jd.requirements && job.jd.requirements.length > 0 ? (
-                  <div>
-                    <p className="label-caps">Requirements</p>
-                    <div className="mt-2">
-                      <BulletList items={job.jd.requirements} />
-                    </div>
-                  </div>
-                ) : null}
-                {job.mustHave && job.mustHave.length > 0 ? (
+                {((job.mustHave && job.mustHave.length > 0) || (job.jd.requirements && job.jd.requirements.length > 0)) ? (
                   <div>
                     <p className="label-caps">Must have</p>
                     <div className="mt-2">
-                      <BulletList items={job.mustHave} tone="success" />
+                      <BulletList
+                        items={job.mustHave && job.mustHave.length > 0 ? job.mustHave : job.jd.requirements}
+                        tone="success"
+                      />
                     </div>
                   </div>
                 ) : null}

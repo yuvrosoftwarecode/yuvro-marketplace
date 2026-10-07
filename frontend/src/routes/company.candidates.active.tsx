@@ -59,6 +59,13 @@ export interface CompanyJob {
   };
 }
 
+function formatWorkModel(wm?: string): string {
+  const s = String(wm || "").toLowerCase();
+  if (s.includes("remote")) return "Remote";
+  if (s.includes("site")) return "On-site";
+  return "Hybrid";
+}
+
 export type StageTone = "brand" | "info" | "success" | "warning" | "default";
 
 export interface PipelineStageItem {
@@ -425,7 +432,7 @@ function ActivePage() {
             <SelectContent>
               {jobs.map((role) => (
                 <SelectItem key={role.id} value={role.id} className="text-xs">
-                  {role.title} · {role.location || role.work_model || "Remote"}
+                  {role.title} · {role.location || formatWorkModel(role.work_model)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -452,7 +459,7 @@ function ActivePage() {
                   </h2>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {selectedJob.location || selectedJob.work_model || "Remote"}
+                  {selectedJob.location || formatWorkModel(selectedJob.work_model)}
                   {stages.length > 0
                     ? ` · ${stages.length}-stage hiring process (${stages.map((s) => s.label).join(" → ")})`
                     : selectedJob.department

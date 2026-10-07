@@ -107,7 +107,7 @@ export type AmJob = {
   department: string;
   employmentType: string;
   location: string;
-  workModel: "Remote" | "Hybrid" | "Onsite";
+  workModel: "Remote" | "Hybrid" | "Onsite" | "On-site";
   experience: string;
   yearsExperience: string;
   salaryMin: number;
@@ -139,8 +139,7 @@ export type AmJob = {
   locationRequirement: string;
   otherRequirements: string[];
   slug?: string;
-  equityMin?: number | null;
-  equityMax?: number | null;
+  equityValue?: number | null;
   companyToYuvroPct?: number;
   yuvroCommissionPct?: number;
   recruiterPct?: number;

@@ -391,13 +391,22 @@ export function mapBackendJobToAmJob(
     (apiJob.employment_type as string) ||
     "Full-time";
 
-  const workModelMap: Record<string, "Remote" | "Hybrid" | "Onsite"> = {
+  const workModelMap: Record<string, "Remote" | "Hybrid" | "On-site"> = {
     remote: "Remote",
     hybrid: "Hybrid",
-    onsite: "Onsite",
+    onsite: "On-site",
+    "on-site": "On-site",
+    Onsite: "On-site",
+    "On-site": "On-site",
   };
+  const rawWm = String(apiJob.work_model || "").toLowerCase();
   const workModel =
-    workModelMap[String(apiJob.work_model || "")] || "Hybrid";
+    workModelMap[rawWm] ||
+    (rawWm.includes("site")
+      ? "On-site"
+      : rawWm.includes("remote")
+        ? "Remote"
+        : "Hybrid");
 
   const salaryData = apiJob.salary as Record<string, unknown> | undefined;
   const bountyData = apiJob.bounty as Record<string, unknown> | undefined;
@@ -485,12 +494,8 @@ export function mapBackendJobToAmJob(
     salaryMin,
     salaryMax,
     currency,
-    equity:
-      apiJob.equity_min != null && apiJob.equity_max != null
-        ? `${apiJob.equity_min}% – ${apiJob.equity_max}%`
-        : "—",
-    equityMin: apiJob.equity_min != null ? Number(apiJob.equity_min) : undefined,
-    equityMax: apiJob.equity_max != null ? Number(apiJob.equity_max) : undefined,
+    equity: apiJob.equity != null ? `${apiJob.equity}%` : "—",
+    equityValue: apiJob.equity != null ? Number(apiJob.equity) : undefined,
     bonus: "—",
     compNotes: "",
     status: (apiJob.status as any) || "active",
@@ -537,7 +542,7 @@ export function mapBackendJobToAmJob(
     jd: {
       aboutRole: String(apiJob.job_description || ""),
       responsibilities: [],
-      requirements: mustHaves,
+      requirements: [],
       benefits: apiJob.benefits_and_perks
         ? [String(apiJob.benefits_and_perks)]
         : [],
@@ -2227,7 +2232,7 @@ export function AmProvider({ children }: { children: ReactNode }) {
         const workModelLower = (job.workModel || "Hybrid").toLowerCase();
         const workModelChoice = workModelLower.includes("remote")
           ? "remote"
-          : workModelLower.includes("onsite")
+          : workModelLower.includes("onsite") || workModelLower.includes("site")
             ? "onsite"
             : "hybrid";
 
@@ -2267,13 +2272,9 @@ export function AmProvider({ children }: { children: ReactNode }) {
           salary_min: Number(job.salaryMin) || 0,
           salary_max: Number(job.salaryMax) || 0,
           salary_currency: job.currency || "USD",
-          equity_min:
-            job.equityMin !== undefined && job.equityMin !== null && !isNaN(Number(job.equityMin))
-              ? Number(job.equityMin)
-              : null,
-          equity_max:
-            job.equityMax !== undefined && job.equityMax !== null && !isNaN(Number(job.equityMax))
-              ? Number(job.equityMax)
+          equity:
+            job.equityValue !== undefined && job.equityValue !== null && !isNaN(Number(job.equityValue))
+              ? Number(job.equityValue)
               : null,
           visa_sponsorship: job.visa || job.sponsorship || "",
           benefits_and_perks:
@@ -2349,8 +2350,9 @@ export function AmProvider({ children }: { children: ReactNode }) {
         if (patch.salaryMin !== undefined) payload.salary_min = patch.salaryMin;
         if (patch.salaryMax !== undefined) payload.salary_max = patch.salaryMax;
         if (patch.currency) payload.salary_currency = patch.currency;
-        if (patch.equityMin !== undefined) payload.equity_min = patch.equityMin;
-        if (patch.equityMax !== undefined) payload.equity_max = patch.equityMax;
+        if (patch.equityValue !== undefined) {
+          payload.equity = patch.equityValue;
+        }
         if (patch.employmentType) {
           const emp = patch.employmentType.toLowerCase();
           payload.employment_type = emp.includes("part")
@@ -2363,7 +2365,11 @@ export function AmProvider({ children }: { children: ReactNode }) {
         }
         if (patch.workModel) {
           const wm = patch.workModel.toLowerCase();
-          payload.work_model = wm.includes("remote") ? "remote" : wm.includes("onsite") ? "onsite" : "hybrid";
+          payload.work_model = wm.includes("remote")
+            ? "remote"
+            : wm.includes("onsite") || wm.includes("site")
+              ? "onsite"
+              : "hybrid";
         }
         if (patch.experience) payload.experience = patch.experience;
         if (patch.openings !== undefined) payload.open_roles = patch.openings;

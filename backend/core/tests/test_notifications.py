@@ -11,6 +11,7 @@ from core.notifications import (
     notify_recruiter_application_approved,
     notify_recruiter_job_assigned,
     notify_recruiter_pipeline_moved,
+    notify_recruiters_job_updated,
 )
 from marketplace.models import Company, Job, JobStatus, RecruiterApplication
 from recruiting.models import (
@@ -205,3 +206,102 @@ class NotificationSystemTests(APITestCase):
         self.assertEqual(notif.category, Notification.Category.PIPELINE)
         self.assertIn("Jane Doe", notif.body)
         self.assertIn("Client Review", notif.body)
+
+    def test_recruiter_notification_when_job_updated_helper(self):
+        # Create a second recruiter to ensure ALL active recruiters receive it
+        recruiter2 = User.objects.create_user(
+            email="recruiter2@yuvro.ai",
+            full_name="Bob Talent",
+            role=User.Role.RECRUITER_FREELANCER,
+        )
+
+        notifs = notify_recruiters_job_updated(
+            job=self.job,
+            updated_by=self.am_user,
+        )
+
+        self.assertEqual(len(notifs), 2)
+        recipients = {n.recipient.email for n in notifs}
+        self.assertIn("recruiter@yuvro.ai", recipients)
+        self.assertIn("recruiter2@yuvro.ai", recipients)
+        self.assertNotIn("am@yuvro.ai", recipients)
+
+        first_notif = notifs[0]
+        self.assertEqual(first_notif.category, Notification.Category.JOBS)
+        self.assertEqual(first_notif.notification_type, "job_updated")
+        self.assertIn("Senior Backend Engineer", first_notif.title)
+        self.assertEqual(first_notif.link, f"/jobs/{self.job.slug}")
+
+    def test_am_updates_job_via_api_notifies_all_recruiters(self):
+        self.client.force_authenticate(user=self.am_user)
+        patch_res = self.client.patch(
+            f"/api/marketplace/jobs/{self.job.id}/",
+            {"salary_min": "160000.00"},
+            format="json",
+        )
+        self.assertEqual(patch_res.status_code, status.HTTP_200_OK)
+
+        # Check recruiter received the notification
+        notif = Notification.objects.filter(
+            recipient=self.recruiter,
+            notification_type="job_updated",
+        ).first()
+        self.assertIsNotNone(notif)
+        self.assertEqual(notif.category, Notification.Category.JOBS)
+        self.assertIn("Senior Backend Engineer", notif.title)
+        self.assertIn("Stripe Partner", notif.body)
+
+        # Recruiter checks notification endpoint
+        self.client.force_authenticate(user=self.recruiter)
+        get_res = self.client.get("/api/notifications/")
+        self.assertEqual(get_res.status_code, status.HTTP_200_OK)
+        results = get_res.data["results"]
+        matching = [r for r in results if r["notification_type"] == "job_updated"]
+        self.assertEqual(len(matching), 1)
+
+    def test_am_updates_job_without_changes_does_not_notify_recruiters(self):
+        self.client.force_authenticate(user=self.am_user)
+
+        # Patch with identical data
+        patch_res = self.client.patch(
+            f"/api/marketplace/jobs/{self.job.id}/",
+            {
+                "title": "Senior Backend Engineer",
+                "salary_min": "150000.00",
+                "salary_max": "180000.00",
+                "location": "Remote",
+            },
+            format="json",
+        )
+        self.assertEqual(patch_res.status_code, status.HTTP_200_OK)
+
+        # Recruiter must NOT have received any job_updated notification
+        count = Notification.objects.filter(
+            recipient=self.recruiter,
+            notification_type="job_updated",
+        ).count()
+        self.assertEqual(count, 0)
+
+    def test_get_job_changed_fields_and_suppression_helper(self):
+        from core.notifications import get_job_changed_fields
+
+        # When comparing job with identical snapshot, returns empty list
+        snapshot = {
+            "title": self.job.title,
+            "salary_min": self.job.salary_min,
+            "salary_max": self.job.salary_max,
+            "location": self.job.location,
+            "equity": self.job.equity,
+        }
+        changes = get_job_changed_fields(snapshot, self.job)
+        self.assertEqual(changes, [])
+
+        # Direct helper call with old_instance being identical suppresses notification
+        notifs = notify_recruiters_job_updated(
+            job=self.job,
+            updated_by=self.am_user,
+            old_instance=snapshot,
+        )
+        self.assertEqual(notifs, [])
+
+

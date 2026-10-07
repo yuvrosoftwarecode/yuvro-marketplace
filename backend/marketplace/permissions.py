@@ -49,7 +49,7 @@ class IsCompanyOwnerOrAdmin(permissions.BasePermission):
         if hasattr(request.user, "company_profile") and request.user.company_profile.company_id == obj.id:
             return True
 
-        return getattr(request.user, "is_account_manager", False)
+        return False
 
 
 class IsJobOwnerOrAdmin(permissions.BasePermission):
@@ -73,4 +73,4 @@ class IsJobOwnerOrAdmin(permissions.BasePermission):
             if hasattr(request.user, "company_profile") and request.user.company_profile.company_id == obj.company.id:
                 return True
 
-        return getattr(request.user, "is_account_manager", False)
+        return False

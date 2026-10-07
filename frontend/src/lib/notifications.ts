@@ -354,6 +354,15 @@ export function mapBackendNotification(bn: AppNotification, rank: number): Notif
   if (type.includes("reject") || title.includes("reject")) {
     category = "Candidates";
     kind = "candidate-rejected";
+  } else if (type.includes("job_updated") || type.includes("job-updated") || title.includes("updated") || title.includes("changed")) {
+    category = "Jobs";
+    kind = "job-updated";
+  } else if (type.includes("job_paused") || title.includes("paused")) {
+    category = "Jobs";
+    kind = "job-paused";
+  } else if (type.includes("job_closed") || title.includes("closed")) {
+    category = "Jobs";
+    kind = "job-closed";
   } else if (cat.includes("pipeline") || type.includes("pipeline")) {
     category = "Candidates";
     kind = "interview-stage";
@@ -365,7 +374,7 @@ export function mapBackendNotification(bn: AppNotification, rank: number): Notif
     kind = "access-approved";
   } else if (cat.includes("job") || type.includes("job")) {
     category = "Jobs";
-    kind = "access-approved";
+    kind = "job-new";
   } else if (cat.includes("message")) {
     category = "Messages";
     kind = "message";

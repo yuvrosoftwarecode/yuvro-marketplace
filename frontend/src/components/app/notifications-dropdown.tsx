@@ -32,6 +32,17 @@ function getNotificationStyle(item: AppNotification) {
     };
   }
 
+  if (type.includes("job_update") || type.includes("job-update") || title.includes("updated") || title.includes("changed")) {
+    return {
+      label: "Job Updated",
+      icon: Briefcase,
+      iconWrapper:
+        "bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/40",
+      badgeClass:
+        "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/40",
+    };
+  }
+
   if (category.includes("job") || type.includes("job")) {
     return {
       label: "Job Assignment",

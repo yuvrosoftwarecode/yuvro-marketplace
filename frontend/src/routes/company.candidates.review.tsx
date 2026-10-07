@@ -182,7 +182,8 @@ function ReviewPage() {
 
           const empType =
             j.employment_type || j.employmentType || "Full-time";
-          const workModel = j.work_model || j.workModel || "Remote";
+          const rawWm = String(j.work_model || j.workModel || "Remote").toLowerCase();
+          const workModel = rawWm.includes("remote") ? "Remote" : rawWm.includes("site") ? "On-site" : "Hybrid";
 
           return {
             id: j.id,

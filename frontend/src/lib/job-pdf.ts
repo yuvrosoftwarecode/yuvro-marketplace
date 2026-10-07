@@ -274,19 +274,164 @@ export async function downloadJobPdf(job: Job) {
     y += 30;
     const X = M + 10;
     const TW = CW - 20;
-    const sub = (s: string) => {
-      ensure(34);
-      y += 6;
-      font(11, "bold", INK);
-      doc.text(clean(s), X, y + 11);
-      y += 20;
+
+    type StyledWord = { text: string; bold: boolean };
+
+    const tokenizeMarkdownInline = (text: string): StyledWord[] => {
+      const words: StyledWord[] = [];
+      const segments = text.split(/(\*\*[\s\S]*?\*\*|__[\s\S]*?__)/g);
+
+      for (const seg of segments) {
+        if (!seg) continue;
+        let isBold = false;
+        let raw = seg;
+        if (
+          (raw.startsWith("**") && raw.endsWith("**") && raw.length >= 4) ||
+          (raw.startsWith("__") && raw.endsWith("__") && raw.length >= 4)
+        ) {
+          isBold = true;
+          raw = raw.slice(2, -2);
+        }
+        raw = raw.replace(/`([^`]+)`/g, "$1").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+        const splitWords = raw.split(/\s+/).filter(Boolean);
+        for (const w of splitWords) {
+          const cleaned = clean(w.replace(/\*\*/g, "").replace(/__/g, ""));
+          if (cleaned) {
+            words.push({ text: cleaned, bold: isBold });
+          }
+        }
+      }
+      return words;
     };
+
+    const renderStyledWords = (
+      words: StyledWord[],
+      x: number,
+      w: number,
+      size = 9.5,
+      color: RGB = BODY
+    ) => {
+      if (words.length === 0) return;
+      const lh = size * 1.45;
+
+      type LineWord = { text: string; bold: boolean };
+      const lines: LineWord[][] = [];
+      let currentLine: LineWord[] = [];
+      let currentLineWidth = 0;
+
+      for (const word of words) {
+        font(size, word.bold ? "bold" : "normal", color);
+        const wordWidth = doc.getTextWidth(word.text);
+        const spaceWidth = doc.getTextWidth(" ");
+        const needed = currentLine.length === 0 ? wordWidth : currentLineWidth + spaceWidth + wordWidth;
+
+        if (currentLine.length > 0 && needed > w) {
+          lines.push(currentLine);
+          currentLine = [word];
+          font(size, word.bold ? "bold" : "normal", color);
+          currentLineWidth = doc.getTextWidth(word.text);
+        } else {
+          currentLine.push(word);
+          currentLineWidth = needed;
+        }
+      }
+      if (currentLine.length > 0) {
+        lines.push(currentLine);
+      }
+
+      for (const line of lines) {
+        ensure(lh);
+        let curX = x;
+        for (let i = 0; i < line.length; i++) {
+          const seg = line[i];
+          font(size, seg.bold ? "bold" : "normal", color);
+          doc.text(seg.text, curX, y + size);
+          curX += doc.getTextWidth(seg.text);
+          if (i < line.length - 1) {
+            curX += doc.getTextWidth(" ");
+          }
+        }
+        y += lh;
+      }
+    };
+
+    const sub = (s: string) => {
+      ensure(30);
+      y += 8;
+      font(11.5, "bold", INK);
+      doc.text(clean(s), X, y + 11.5);
+      y += 18;
+    };
+
     const item = (s: string, n?: number) => {
-      font(9.5, "normal", MUTED);
       ensure(14);
+      font(9.5, n ? "bold" : "normal", MUTED);
       doc.text(n ? `${n}.` : "\u2022", X + 4, y + 9.5);
-      para(s, X + 18, TW - 18);
-      y += 2;
+      const words = tokenizeMarkdownInline(s);
+      renderStyledWords(words, n ? X + 18 : X + 16, n ? TW - 18 : TW - 16, 9.5, BODY);
+      y += 2.5;
+    };
+
+    const renderMarkdownContent = (rawMarkdown: string) => {
+      if (!rawMarkdown || !rawMarkdown.trim()) return;
+
+      const normalized = rawMarkdown
+        .replace(/\r\n/g, "\n")
+        .replace(/\r/g, "\n")
+        .replace(/([^\n])\s+(#{1,4}\s+)/g, "$1\n\n$2")
+        .replace(/([^\n])\s+([*•\-]\s+)/g, "$1\n$2")
+        .replace(/([^\n])\s+(\d+\.\s+)/g, "$1\n$2");
+
+      const lines = normalized.split("\n");
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+
+        if (!trimmed) {
+          y += 3;
+          continue;
+        }
+
+        if (trimmed.startsWith("# ")) {
+          ensure(32);
+          y += 8;
+          font(13.5, "bold", INK);
+          const t = clean(trimmed.slice(2).replace(/\*\*/g, "").trim());
+          doc.text(t, X, y + 13.5);
+          y += 20;
+        } else if (trimmed.startsWith("## ")) {
+          ensure(26);
+          y += 6;
+          font(11.5, "bold", INK);
+          const t = clean(trimmed.slice(3).replace(/\*\*/g, "").trim());
+          doc.text(t, X, y + 11.5);
+          y += 18;
+        } else if (trimmed.startsWith("### ") || trimmed.startsWith("#### ")) {
+          ensure(22);
+          y += 4;
+          font(10.5, "bold", INK);
+          const t = clean(trimmed.replace(/^#+\s*/, "").replace(/\*\*/g, "").trim());
+          doc.text(t, X, y + 10.5);
+          y += 16;
+        } else if (/^[-*•+]\s+/.test(trimmed)) {
+          const bulletText = trimmed.replace(/^[-*•+]\s+/, "").trim();
+          item(bulletText);
+        } else if (/^\d+\.\s+/.test(trimmed)) {
+          const match = trimmed.match(/^(\d+)\.\s+(.+)$/);
+          if (match) {
+            item(match[2].trim(), Number(match[1]));
+          } else {
+            const words = tokenizeMarkdownInline(trimmed);
+            renderStyledWords(words, X, TW, 9.5, BODY);
+            y += 3.5;
+          }
+        } else {
+          const words = tokenizeMarkdownInline(trimmed);
+          renderStyledWords(words, X, TW, 9.5, BODY);
+          y += 3.5;
+        }
+      }
     };
 
     const aboutList = Array.isArray(job.about) ? job.about : [];
@@ -301,18 +446,31 @@ export async function downloadJobPdf(job: Job) {
 
     if (companyBlurb) {
       sub(`About ${job.company || "Company"}`);
-      para(companyBlurb, X, TW);
+      renderMarkdownContent(companyBlurb);
     }
 
-    for (const s of aboutList.filter((s) => !s?.heading?.toLowerCase().includes("company"))) {
-      if (!s) continue;
-      sub(s.heading || "Details");
-      if (/responsib|own/i.test(s.heading || "")) {
-        String(s.body || "").split(/\.\s+/).map((x) => x.replace(/\.$/, "").trim()).filter(Boolean).forEach((t) => item(t));
-      } else para(s.body || "", X, TW);
+    const roleContent =
+      job.jobDescription ||
+      aboutList
+        .filter((s) => !s?.heading?.toLowerCase().includes("company"))
+        .map((s) => (s?.heading && !s.heading.toLowerCase().includes("overview") ? `## ${s.heading}\n\n${s.body}` : s?.body || ""))
+        .join("\n\n");
+
+    if (roleContent && roleContent.trim()) {
+      renderMarkdownContent(roleContent);
+    } else {
+      for (const s of aboutList.filter((s) => !s?.heading?.toLowerCase().includes("company"))) {
+        if (!s) continue;
+        if (!s.heading?.toLowerCase().includes("overview")) {
+          sub(s.heading || "Details");
+        }
+        renderMarkdownContent(s.body || "");
+      }
     }
 
-    const reqs = Array.isArray(job.requirements) ? job.requirements : [];
+    const reqs =
+      (Array.isArray(job.mustHaves) && job.mustHaves.length > 0 ? job.mustHaves : job.requirements) ||
+      [];
     if (reqs.length) {
       sub("Must-Have");
       reqs.forEach((r, i) => item(r, i + 1));
@@ -325,7 +483,31 @@ export async function downloadJobPdf(job: Job) {
     const bens = Array.isArray(job.benefits) ? job.benefits : [];
     if (bens.length) {
       sub("Benefits & Perks");
-      bens.forEach((b) => item(`${b.group || "Perks"}: ${Array.isArray(b.items) ? b.items.join(", ") : b.items || ""}`));
+      bens.forEach((b) => {
+        const rawItems = Array.isArray(b.items) ? b.items : [b.items];
+        const items = rawItems
+          .flatMap((it) => {
+            const s = String(it ?? "").trim();
+            if (s.includes("\n")) return s.split("\n");
+            if (s.includes(" · ")) return s.split(" · ");
+            if (s.includes("•")) return s.split("•");
+            if (s.includes(";")) return s.split(";");
+            return [s];
+          })
+          .map((x) => x.trim().replace(/^[-*•]\s*/, ""))
+          .filter(Boolean);
+
+        if (b.group && b.group !== "Company Benefits" && b.group !== "Perks") {
+          ensure(18);
+          font(10, "bold", INK);
+          doc.text(clean(b.group), X + 4, y + 10);
+          y += 14;
+        }
+
+        items.forEach((benefit) => {
+          item(benefit);
+        });
+      });
     }
 
     // ---------- Footer ----------
@@ -336,7 +518,6 @@ export async function downloadJobPdf(job: Job) {
       doc.line(M, H - 34, W - M, H - 34);
       font(8, "normal", MUTED);
       doc.text(`Page ${p} of ${pages}`, M, H - 22);
-      doc.text("Generated by Yuvro", W - M, H - 22, { align: "right" });
     }
 
     const slug = `${clean(job.companyShort || job.company || "Job")}-${clean(job.title || "JD")}`.replace(/[^a-z0-9]+/gi, "_").replace(/^_|_$/g, "");

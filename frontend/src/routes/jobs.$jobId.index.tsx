@@ -14,6 +14,7 @@ import { StatusBadge } from "@/components/app/status-badge";
 import { ActivityItem } from "@/components/app/activity-item";
 import { activityForJob, candidatesForJob, getJob, type Job } from "@/lib/data";
 import { fetchRecruiterJobById } from "@/lib/recruiter-jobs";
+import { MarkdownContent } from "@/components/common/markdown-content";
 
 export const Route = createFileRoute("/jobs/$jobId/")({
   loader: ({ params }) => {
@@ -124,9 +125,11 @@ function JobDetailsTab() {
         <Panel>
           <PanelHeader title={`About ${job.company}`} />
           <div className="px-4 py-3">
-            <p className="text-[13px] leading-6 text-muted-foreground">
-              {job.about?.find((s) => s.heading.toLowerCase().includes("company"))?.body ?? job.repeatFounders}
-            </p>
+            {job.companyOverview || job.about?.find((s) => s.heading.toLowerCase().includes("company"))?.body || (job.repeatFounders && job.repeatFounders !== "—" ? job.repeatFounders : null) ? (
+              <p className="text-[13px] leading-6 text-muted-foreground">
+                {job.companyOverview || job.about?.find((s) => s.heading.toLowerCase().includes("company"))?.body || job.repeatFounders}
+              </p>
+            ) : null}
             <div className="mt-3 grid grid-cols-3 gap-2">
               {[
                 { label: "Size", value: job.companySize },
@@ -153,9 +156,37 @@ function JobDetailsTab() {
                 <ExternalLink className="size-3.5 shrink-0 text-muted-foreground" />
               </a>
             ) : null}
-            <p className="mt-3 text-xs leading-5 text-muted-foreground">
-              {job.fundingAmount} {job.investors?.length ? `· ${job.investors.join(", ")}` : ""}
-            </p>
+            {job.fundingAmount && job.fundingAmount !== "—" ? (
+              <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                {job.fundingAmount} {job.investors?.length ? `· ${job.investors.join(", ")}` : ""}
+              </p>
+            ) : null}
+
+            {job.whyCompany && job.whyCompany.length > 0 ? (
+              <div className="mt-4 border-t border-border pt-3">
+                <p className="label-caps text-foreground">Why {job.company}</p>
+                <div className="mt-2 space-y-2">
+                  {job.whyCompany.map((item, idx) => (
+                    <div key={idx} className="rounded-md bg-surface-sunken/60 p-2.5">
+                      {item.title ? (
+                        <p className="text-[13px] font-medium text-foreground">{item.title}</p>
+                      ) : null}
+                      {item.description ? (
+                        <p className="mt-0.5 text-[12.5px] leading-5 text-muted-foreground">{item.description}</p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {job.whyRole ? (
+              <div className="mt-3 border-t border-border/60 pt-2.5">
+                <p className="label-caps text-foreground">Why this role matters</p>
+                <p className="mt-1 text-[12.5px] leading-5 text-muted-foreground">{job.whyRole}</p>
+              </div>
+            ) : null}
+
             <Link
               to="/jobs/$jobId/pipeline"
               params={{ jobId: job.id }}
@@ -168,36 +199,17 @@ function JobDetailsTab() {
 
         <Panel>
           <PanelHeader title="About this role" meta={`${job.company} · posted ${job.posted}`} />
-          <div className="max-h-[520px] space-y-5 overflow-y-auto px-4 py-4">
-            {narrative.map((s) => (
-              <div key={s.heading}>
-                <SectionLabel>{s.heading}</SectionLabel>
-                <p className="mt-1.5 max-w-[78ch] text-[13.5px] leading-6 text-muted-foreground">{s.body}</p>
-              </div>
-            ))}
-
-            {responsibilities ? (
-              <div>
-                <SectionLabel>What you&apos;ll own</SectionLabel>
-                <ol className="mt-2 space-y-2">
-                  {responsibilities.body
-                    .split(". ")
-                    .map((x) => x.replace(/\.$/, "").trim())
-                    .filter(Boolean)
-                    .map((item, i) => (
-                      <li
-                        key={item}
-                        className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-md bg-surface-sunken px-3 py-2.5"
-                      >
-                        <span className="num text-[11px] font-semibold text-muted-foreground">
-                          {String(i + 1).padStart(2, "0")}
-                        </span>
-                        <span className="text-[13.5px] leading-6 text-foreground">{item}</span>
-                      </li>
-                    ))}
-                </ol>
-              </div>
-            ) : null}
+          <div className="max-h-[560px] overflow-y-auto px-4 py-4">
+            <MarkdownContent
+              content={
+                job.jobDescription ||
+                (job.about && job.about.length > 0
+                  ? job.about
+                      .map((s) => (s.heading && !s.heading.toLowerCase().includes("overview") ? `### ${s.heading}\n\n${s.body}` : s.body))
+                      .join("\n\n")
+                  : "")
+              }
+            />
           </div>
         </Panel>
 
@@ -243,25 +255,30 @@ function JobDetailsTab() {
       </div>
 
       <aside className="min-w-0 space-y-5">
-        {job.requirements && job.requirements.length ? (
-          <Panel>
-            <PanelHeader
-              title="Requirements"
-              meta={`${job.requirements.length} criteria`}
-              actions={<StatusBadge tone="neutral">{job.experience}</StatusBadge>}
-            />
-            <div className="grid gap-2 p-4">
-              {job.requirements.map((r) => (
-                <div
-                  key={r}
-                  className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2.5 rounded-md border border-border px-3 py-2.5"
-                >
-                  <Check className="mt-0.5 size-3.5 shrink-0 text-brand" />
-                  <span className="text-[13px] leading-5 text-foreground">{r}</span>
+        {((job.mustHaves && job.mustHaves.length > 0) || (job.requirements && job.requirements.length > 0)) ? (
+          (() => {
+            const list = (job.mustHaves && job.mustHaves.length > 0 ? job.mustHaves : job.requirements) || [];
+            return (
+              <Panel>
+                <PanelHeader
+                  title="Must-haves"
+                  meta={`${list.length} criteria`}
+                  actions={<StatusBadge tone="neutral">{job.experience}</StatusBadge>}
+                />
+                <div className="grid gap-2 p-4">
+                  {list.map((r) => (
+                    <div
+                      key={r}
+                      className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2.5 rounded-md border border-border px-3 py-2.5"
+                    >
+                      <Check className="mt-0.5 size-3.5 shrink-0 text-brand" />
+                      <span className="text-[13px] leading-5 text-foreground">{r}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </Panel>
+              </Panel>
+            );
+          })()
         ) : null}
 
         {job.targetCompanies && job.targetCompanies.length > 0 ? (
@@ -300,12 +317,33 @@ function JobDetailsTab() {
           <Panel>
             <PanelHeader title="Benefits & perks" meta={`${job.benefits.length} groups`} />
             <div className="grid gap-2 p-4">
-              {job.benefits.map((b) => (
-                <div key={b.group} className="rounded-md bg-surface-sunken px-3 py-2.5">
-                  <p className="text-[13px] font-semibold text-foreground">{b.group}</p>
-                  <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{b.items.join(" · ")}</p>
-                </div>
-              ))}
+              {job.benefits.map((b) => {
+                const items = (b.items || [])
+                  .flatMap((it) => {
+                    const s = String(it ?? "").trim();
+                    if (s.includes("\n")) return s.split("\n");
+                    if (s.includes(" · ")) return s.split(" · ");
+                    if (s.includes("•")) return s.split("•");
+                    if (s.includes(";")) return s.split(";");
+                    return [s];
+                  })
+                  .map((x) => x.trim().replace(/^[-*•]\s*/, ""))
+                  .filter(Boolean);
+
+                return (
+                  <div key={b.group} className="rounded-md bg-surface-sunken px-3 py-2.5">
+                    <p className="text-[13px] font-semibold text-foreground">{b.group}</p>
+                    <ul className="mt-2 space-y-1.5">
+                      {items.map((item, idx) => (
+                        <li key={idx} className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
+                          <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/60" />
+                          <span className="min-w-0 flex-1">{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })}
             </div>
           </Panel>
         ) : null}

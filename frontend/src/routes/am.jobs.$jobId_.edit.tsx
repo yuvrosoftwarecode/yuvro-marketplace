@@ -63,7 +63,7 @@ function normEmpType(t?: string): string {
 function normWorkModel(w?: string): string {
   const s = String(w || "").toLowerCase();
   if (s.includes("remote")) return "remote";
-  if (s.includes("onsite") || s.includes("on-site")) return "onsite";
+  if (s.includes("onsite") || s.includes("site")) return "onsite";
   return "hybrid";
 }
 
@@ -100,8 +100,6 @@ function AmEditJobPage() {
     salaryMin: "",
     salaryMax: "",
     salaryCurrency: "USD",
-    equityMin: "",
-    equityMax: "",
     companyToYuvroPct: "20",
     yuvroCommissionPct: "5",
     recruiterSlots: "6",
@@ -138,10 +136,12 @@ function AmEditJobPage() {
         salaryMin: job.salaryMin ? String(job.salaryMin) : "",
         salaryMax: job.salaryMax ? String(job.salaryMax) : "",
         salaryCurrency: job.currency || "USD",
-        equityMin:
-          job.equityMin !== undefined && job.equityMin !== null ? String(job.equityMin) : "",
-        equityMax:
-          job.equityMax !== undefined && job.equityMax !== null ? String(job.equityMax) : "",
+        equity:
+          job.equityValue !== undefined && job.equityValue !== null
+            ? String(job.equityValue)
+            : job.equity && job.equity !== "—"
+            ? job.equity.replace(/[^0-9.]/g, "")
+            : "",
         companyToYuvroPct:
           job.companyToYuvroPct !== undefined ? String(job.companyToYuvroPct) : "20",
         yuvroCommissionPct:
@@ -235,18 +235,9 @@ function AmEditJobPage() {
         return false;
       }
 
-      const eqMin = parseFloat(form.equityMin);
-      if (!form.equityMin.trim() || isNaN(eqMin) || eqMin < 0) {
-        toast.error("Equity minimum is required (enter 0 if none).");
-        return false;
-      }
-      const eqMax = parseFloat(form.equityMax);
-      if (!form.equityMax.trim() || isNaN(eqMax) || eqMax < 0) {
-        toast.error("Equity maximum is required.");
-        return false;
-      }
-      if (eqMin > eqMax) {
-        toast.error("Minimum equity % cannot be greater than maximum equity %.");
+      const eq = parseFloat(form.equity);
+      if (!form.equity.trim() || isNaN(eq) || eq < 0) {
+        toast.error("Equity % is required (enter 0 if none).");
         return false;
       }
 
@@ -362,8 +353,7 @@ function AmEditJobPage() {
       }
     }
 
-    const eqMin = form.equityMin.trim() ? parseFloat(form.equityMin) : null;
-    const eqMax = form.equityMax.trim() ? parseFloat(form.equityMax) : null;
+    const eq = form.equity.trim() ? parseFloat(form.equity) : null;
 
     const parsedPayoutTerms = form.payoutTerms
       .split(",")
@@ -386,7 +376,7 @@ function AmEditJobPage() {
       employmentTypes.find((e) => e.value === form.employmentType)?.label || "Full-time";
     const workModelLabel =
       (workModels.find((w) => w.value === form.workModel)?.label as
-        "Remote" | "Hybrid" | "Onsite") || "Hybrid";
+        "Remote" | "Hybrid" | "Onsite" | "On-site") || "Hybrid";
 
     const patch: Partial<AmJob> = {
       companyId: form.companyId,
@@ -402,9 +392,8 @@ function AmEditJobPage() {
       salaryMin: salaryMinNum,
       salaryMax: salaryMaxNum,
       currency: form.salaryCurrency as "USD" | "GBP" | "EUR",
-      equity: eqMin !== null && eqMax !== null ? `${eqMin}% – ${eqMax}%` : "—",
-      equityMin: eqMin,
-      equityMax: eqMax,
+      equity: eq !== null ? `${eq}%` : "—",
+      equityValue: eq,
       companyToYuvroPct: companyFeePct,
       yuvroCommissionPct: yuvroCommPct,
       recruiterPct,
@@ -698,30 +687,18 @@ function AmEditJobPage() {
               </select>
             </Field>
 
-            <div className="grid grid-cols-2 gap-2">
-              <Field label="Equity min (%) *" hint="e.g. 0.05">
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  className={inputCls}
-                  value={form.equityMin}
-                  onChange={(e) => set("equityMin", e.target.value)}
-                  placeholder="0.05"
-                />
-              </Field>
-              <Field label="Equity max (%) *" hint="e.g. 0.12">
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  className={inputCls}
-                  value={form.equityMax}
-                  onChange={(e) => set("equityMax", e.target.value)}
-                  placeholder="0.12"
-                />
-              </Field>
-            </div>
+            <Field label="Equity (%) *" hint="e.g. 0.10">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                className={inputCls}
+                value={form.equity}
+                onChange={(e) => set("equity", e.target.value)}
+                placeholder="0.10"
+              />
+            </Field>
 
             <Field
               label="Company to Yuvro fee (%) *"

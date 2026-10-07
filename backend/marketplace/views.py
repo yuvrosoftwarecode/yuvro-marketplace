@@ -626,7 +626,25 @@ class JobViewSet(viewsets.ModelViewSet):
                 logger.warning(f"Failed to dispatch company job added notifications: {e}")
 
     def perform_update(self, serializer):
-        old_status = self.get_object().status
+        # Capture pre-save snapshot of existing Job before serializer.save() mutates it in place
+        job_instance = getattr(serializer, "instance", None)
+        job_id = getattr(job_instance, "id", None)
+        old_snapshot = None
+        old_status = None
+        if job_id:
+            old_job = Job.objects.filter(id=job_id).first()
+            if old_job:
+                from core.notifications import TRACKED_JOB_FIELDS
+                old_snapshot = {
+                    f: getattr(old_job, f, None)
+                    for f in TRACKED_JOB_FIELDS
+                }
+                old_status = old_job.status
+            elif job_instance:
+                old_status = getattr(job_instance, "status", None)
+        elif job_instance:
+            old_status = getattr(job_instance, "status", None)
+
         job = serializer.save()
         new_status = job.status
         user = self.request.user
@@ -651,6 +669,24 @@ class JobViewSet(viewsets.ModelViewSet):
                 send_company_job_added_email(job)
             except Exception as e:
                 logger.warning(f"Failed to dispatch company job added notifications on update: {e}")
+
+        # If Account Manager changes the job, notify all recruiters ONLY if tracked fields actually changed
+        if is_am_user and job.status != JobStatus.DRAFT:
+            try:
+                from core.notifications import get_job_changed_fields, notify_recruiters_job_updated
+
+                changed_fields = get_job_changed_fields(old_snapshot, job) if old_snapshot else []
+                if changed_fields:
+                    notify_recruiters_job_updated(
+                        job=job,
+                        updated_by=user,
+                        old_instance=old_snapshot,
+                        changed_fields=changed_fields,
+                    )
+                else:
+                    logger.info(f"No tracked fields changed for job {job.id}; suppressing notification.")
+            except Exception as e:
+                logger.warning(f"Failed to dispatch recruiter job updated notifications on update: {e}")
 
     @action(detail=True, methods=["post"], url_path="approve")
     def approve(self, request, pk=None):
@@ -705,15 +741,21 @@ class JobViewSet(viewsets.ModelViewSet):
             except Exception:
                 pass
 
+        from core.notifications import TRACKED_JOB_FIELDS
+        old_snapshot = {
+            f: getattr(job, f, None)
+            for f in TRACKED_JOB_FIELDS
+        }
         job.status = JobStatus.ACTIVE
         job.posted_at = timezone.now()
         job.save()
 
         try:
-            from core.notifications import notify_company_job_approved
+            from core.notifications import notify_company_job_approved, notify_recruiters_job_updated
             notify_company_job_approved(job)
+            notify_recruiters_job_updated(job=job, updated_by=user, old_instance=old_snapshot)
         except Exception as e:
-            logger.warning(f"Failed to dispatch company job approved notification: {e}")
+            logger.warning(f"Failed to dispatch job approved notifications: {e}")
 
         return Response(self.get_serializer(job).data, status=status.HTTP_200_OK)
 
@@ -740,12 +782,23 @@ class JobViewSet(viewsets.ModelViewSet):
         data = request.data or {}
         reason = data.get("reason", "").strip()
 
+        from core.notifications import TRACKED_JOB_FIELDS
+        old_snapshot = {
+            f: getattr(job, f, None)
+            for f in TRACKED_JOB_FIELDS
+        }
         job.status = JobStatus.CLOSED
         if reason:
             if not isinstance(job.signals, dict):
                 job.signals = {}
             job.signals["rejection_reason"] = reason
         job.save()
+
+        try:
+            from core.notifications import notify_recruiters_job_updated
+            notify_recruiters_job_updated(job=job, updated_by=user, old_instance=old_snapshot)
+        except Exception as e:
+            logger.warning(f"Failed to dispatch recruiter job update notification on reject: {e}")
 
         return Response(self.get_serializer(job).data, status=status.HTTP_200_OK)
 

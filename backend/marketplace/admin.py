@@ -148,8 +148,7 @@ class JobAdmin(admin.ModelAdmin):
                     "salary_min",
                     "salary_max",
                     "salary_currency",
-                    "equity_min",
-                    "equity_max",
+                    "equity",
                 )
             },
         ),

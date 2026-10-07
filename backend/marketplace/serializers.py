@@ -373,8 +373,7 @@ class JobSerializer(serializers.ModelSerializer):
             "salary_min",
             "salary_max",
             "salary_currency",
-            "equity_min",
-            "equity_max",
+            "equity",
             "visa_sponsorship",
             "benefits_and_perks",
             "company_to_yuvro_percentage",
@@ -415,6 +414,18 @@ class JobSerializer(serializers.ModelSerializer):
                 "target_companies must be a list of company names."
             )
         return [str(c).strip() for c in value if str(c).strip()]
+
+    def validate_work_model(self, value):
+        if not value:
+            return WorkModel.HYBRID
+        val = str(value).lower().strip()
+        if "remote" in val:
+            return WorkModel.REMOTE
+        if "site" in val:
+            return WorkModel.ONSITE
+        if "hybrid" in val:
+            return WorkModel.HYBRID
+        return value
 
     def validate_salary_min(self, value):
         if value is not None and value < Decimal("0.00"):
@@ -545,13 +556,10 @@ class JobSerializer(serializers.ModelSerializer):
                 }
             )
 
-        # Equity Range Check if supplied
-        eq_min = attrs.get("equity_min", getattr(self.instance, "equity_min", None))
-        eq_max = attrs.get("equity_max", getattr(self.instance, "equity_max", None))
-        if eq_min is not None and eq_max is not None and eq_min > eq_max:
-            raise serializers.ValidationError(
-                {"equity_min": "equity_min cannot be greater than equity_max."}
-            )
+        # Equity Check if supplied
+        if "equity" in attrs and attrs["equity"] is not None:
+            if attrs["equity"] < Decimal("0.00"):
+                raise serializers.ValidationError({"equity": "Equity percentage cannot be negative."})
 
         return attrs
 
