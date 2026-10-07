@@ -355,7 +355,7 @@ DEPLOY_EOF
 
 setup_nginx() {
     local ip="$1"
-    print_step "Setting up Nginx & SSL for marketplace domains..."
+    print_step "Setting up Nginx & SSL for marketplace.yuvro.ai & backend-marketplace.yuvro.ai..."
 
     if [ -f "$PROJECT_ROOT/frontend/nginx.ec2.conf" ]; then
         scp_ec2 "$PROJECT_ROOT/frontend/nginx.ec2.conf" "ubuntu@$ip:/tmp/yuvro-marketplace.conf"
@@ -369,61 +369,23 @@ if ! command -v nginx &>/dev/null; then
 fi
 sudo mkdir -p /var/www/certbot
 sudo rm -f /etc/nginx/sites-enabled/default
-
-DOMAINS=("marketplace.yuvro.ai" "backend-marketplace.yuvro.ai" "marketplace-dev.yuvro.ai" "backend-marketplace-dev.yuvro.ai")
-CERT_EMAIL="admin@yuvro.ai"
-
-# If any domain is missing an SSL certificate, bootstrap HTTP first to allow ACME challenges
-MISSING_CERT=0
-for domain in "${DOMAINS[@]}"; do
-    if [ ! -f "/etc/letsencrypt/live/$domain/fullchain.pem" ]; then
-        MISSING_CERT=1
-        break
-    fi
-done
-
-if [ "$MISSING_CERT" -eq 1 ]; then
-    echo "⚠️ Missing SSL certificate(s) detected; bootstrapping HTTP for Certbot challenge..."
-    cat << 'BOOTSTRAP_EOF' | sudo tee /etc/nginx/sites-available/bootstrap-certbot.conf > /dev/null
-server {
-    listen 80 default_server;
-    server_name _;
-    location /.well-known/acme-challenge/ { root /var/www/certbot; }
-    location / { return 200 "Certbot bootstrap\n"; }
-}
-BOOTSTRAP_EOF
-    sudo rm -f /etc/nginx/sites-enabled/*
-    sudo ln -sf /etc/nginx/sites-available/bootstrap-certbot.conf /etc/nginx/sites-enabled/bootstrap-certbot.conf
-    sudo nginx -t && sudo systemctl restart nginx || true
-
-    for domain in "${DOMAINS[@]}"; do
-        if [ ! -f "/etc/letsencrypt/live/$domain/fullchain.pem" ]; then
-            echo "🔐 Requesting SSL certificate for $domain..."
-            sudo certbot certonly --webroot -w /var/www/certbot -d "$domain" --non-interactive --agree-tos --email "$CERT_EMAIL" || true
-        fi
-    done
-    sudo rm -f /etc/nginx/sites-enabled/bootstrap-certbot.conf /etc/nginx/sites-available/bootstrap-certbot.conf
-
-    # Fallback: if certbot couldn't obtain cert (e.g. DNS not yet propagated), generate dummy cert so nginx -t doesn't fail
-    for domain in "${DOMAINS[@]}"; do
-        if [ ! -f "/etc/letsencrypt/live/$domain/fullchain.pem" ]; then
-            echo "⚠️ Generating temporary certificate for $domain..."
-            sudo mkdir -p "/etc/letsencrypt/live/$domain"
-            sudo openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
-                -keyout "/etc/letsencrypt/live/$domain/privkey.pem" \
-                -out "/etc/letsencrypt/live/$domain/fullchain.pem" \
-                -subj "/CN=$domain" 2>/dev/null || true
-            sudo cp "/etc/letsencrypt/live/$domain/fullchain.pem" "/etc/letsencrypt/live/$domain/chain.pem" 2>/dev/null || true
-        fi
-    done
-fi
-
 if [ -f /tmp/yuvro-marketplace.conf ]; then
     sudo mv /tmp/yuvro-marketplace.conf /etc/nginx/sites-available/yuvro-marketplace.conf
     sudo ln -sf /etc/nginx/sites-available/yuvro-marketplace.conf /etc/nginx/sites-enabled/yuvro-marketplace.conf
 fi
-
 sudo nginx -t && sudo systemctl reload nginx || sudo systemctl restart nginx
+
+DOMAINS=("marketplace.yuvro.ai" "backend-marketplace.yuvro.ai")
+CERT_EMAIL="admin@yuvro.ai"
+
+for domain in "${DOMAINS[@]}"; do
+    if [ ! -d "/etc/letsencrypt/live/$domain" ]; then
+        echo "🔐 Requesting SSL certificate for $domain..."
+        sudo certbot --nginx -d "$domain" --non-interactive --agree-tos --email "$CERT_EMAIL" --redirect || true
+    fi
+done
+
+sudo nginx -t && sudo systemctl reload nginx
 NGINX_EOF
     print_success "Nginx & SSL configured"
 }
