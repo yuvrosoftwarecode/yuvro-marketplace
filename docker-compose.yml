@@ -1,7 +1,7 @@
 services:
   ymarketplace-backend:
     build:
-      context: ./ymarketplace/backend
+      context: ./backend
       dockerfile: Dockerfile
       target: development
       args:
@@ -23,18 +23,18 @@ services:
 
   ymarketplace-frontend:
     build:
-      context: ./ymarketplace/frontend
+      context: ./frontend
       dockerfile: Dockerfile
       target: development
     stdin_open: true
     tty: true
-    command: bunx vite dev --host 0.0.0.0 --port 3004
+    command: npm run dev -- --host 0.0.0.0 --port 3004
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3004"]
       interval: 15s
       timeout: 10s
-      retries: 5
-      start_period: 30s
+      retries: 15
+      start_period: 90s
     restart: on-failure
     networks:
       - ymarketplace
@@ -45,3 +45,4 @@ networks:
     driver: bridge
   yuvro-storage:
     external: true
+    name: yuvro_yuvro-storage
