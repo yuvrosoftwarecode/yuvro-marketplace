@@ -28,7 +28,7 @@ services:
       target: development
     stdin_open: true
     tty: true
-    command: npm run dev -- --host 0.0.0.0
+    command: bunx vite dev --host 0.0.0.0 --port 3004
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3004"]
       interval: 15s
