@@ -19,13 +19,8 @@ mediafiles/
 local_settings.py
 
 # Environment files (NEVER commit these)
-.env
-.env.local
-.env.dev
-.env.staging
-.env.prod
-.env.*-secrets
-!.env.*.example
+**/.env.*-secrets
+
 
 # Node.js & Bun
 node_modules/
