@@ -1,8 +1,0 @@
-aws_region        = "ap-south-1"
-environment       = "dev"
-key_name          = "cloudvex-yuvro-dev"
-instance_type     = "t3.medium"
-db_name           = "yuvro_marketplace_cloudvex_db"
-db_username       = "marketplace_admin"
-db_password       = "ChangeMe123!DevPassword"
-db_instance_class = "db.t4g.micro"

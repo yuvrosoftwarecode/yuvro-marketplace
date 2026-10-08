@@ -3,9 +3,9 @@ services:
     image: postgres:16-alpine
     command: postgres -p 5436
     env_file:
-      - path: ymarketplace/backend/.env.local
+      - path: backend/.env.local
         required: false
-      - path: ymarketplace/backend/.env.local-secrets
+      - path: backend/.env.local-secrets
         required: false
     environment:
       POSTGRES_PASSWORD: postgres
@@ -27,7 +27,7 @@ services:
 
   ymarketplace-backend:
     build:
-      context: ymarketplace/backend
+      context: backend
       dockerfile: Dockerfile
       target: local
       args:
@@ -35,12 +35,12 @@ services:
     ports:
       - "8004:8004"  # Django API (host: 8004)
     env_file:
-      - path: ymarketplace/backend/.env.local
+      - path: backend/.env.local
         required: false
-      - path: ymarketplace/backend/.env.local-secrets
+      - path: backend/.env.local-secrets
         required: false
     volumes:
-      - ymarketplace/backend:/app
+      - backend:/app
       - /app/venv
     command: >
       sh -c "python manage.py migrate --noinput &&
@@ -61,16 +61,16 @@ services:
 
   ymarketplace-frontend:
     build:
-      context: ymarketplace/frontend
+      context: frontend
       dockerfile: Dockerfile
       target: local
     env_file:
-      - path: ymarketplace/frontend/.env.local
+      - path: frontend/.env.local
         required: false
-      - path: ymarketplace/frontend/.env.local-secrets
+      - path: frontend/.env.local-secrets
         required: false
     volumes:
-      - ymarketplace/frontend:/app
+      - frontend:/app
       - /app/node_modules
     ports:
       - "3004:3004"  # Frontend (host: 3004)
