@@ -1,49 +1,14 @@
 services:
-  ymarketplace-db:
-    image: postgres:16-alpine
-    command: postgres -p 5436
-    env_file:
-      - path: backend/.env.local
-        required: false
-      - path: backend/.env.local-secrets
-        required: false
-    environment:
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: yuvro_marketplace_db
-    volumes:
-      - ymarketplace_postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5436:5436"  # YMarketplace PostgreSQL
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d yuvro_marketplace_db -p 5436"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
-    restart: on-failure
-    networks:
-      - ymarketplace
-      - yuvro-storage
-
   ymarketplace-backend:
     build:
-      context: backend
+      context: ./ymarketplace/backend
       dockerfile: Dockerfile
-      target: local
+      target: development
       args:
         - CACHEBUST=${CACHEBUST:-1}
-    ports:
-      - "8004:8004"  # Django API (host: 8004)
-    env_file:
-      - path: backend/.env.local
-        required: false
-      - path: backend/.env.local-secrets
-        required: false
-    volumes:
-      - backend:/app
-      - /app/venv
     command: >
-      sh -c "python manage.py migrate --noinput &&
+      sh -c "python manage.py makemigrations &&
+             python manage.py migrate &&
              python manage.py runserver 0.0.0.0:8004"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8004/api/health/"]
@@ -52,54 +17,31 @@ services:
       retries: 10
       start_period: 60s
     restart: on-failure
-    depends_on:
-      ymarketplace-db:
-        condition: service_healthy
     networks:
       - ymarketplace
       - yuvro-storage
 
   ymarketplace-frontend:
     build:
-      context: frontend
+      context: ./ymarketplace/frontend
       dockerfile: Dockerfile
-      target: local
-    env_file:
-      - path: frontend/.env.local
-        required: false
-      - path: frontend/.env.local-secrets
-        required: false
-    volumes:
-      - frontend:/app
-      - /app/node_modules
-    ports:
-      - "3004:3004"  # Frontend (host: 3004)
-    environment:
-      VITE_HMR_HOST: localhost
-      VITE_HMR_PORT: "3004"
+      target: development
     stdin_open: true
     tty: true
-    depends_on:
-      ymarketplace-backend:
-        condition: service_started
+    command: npm run dev -- --host 0.0.0.0
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3004/"]
+      test: ["CMD", "curl", "-f", "http://localhost:3004"]
       interval: 15s
       timeout: 10s
       retries: 5
-      start_period: 60s
+      start_period: 30s
     restart: on-failure
     networks:
       - ymarketplace
       - yuvro-storage
 
-volumes:
-  ymarketplace_postgres_data:
-
 networks:
   ymarketplace:
-    external: true
-    name: yuvro_marketplace
+    driver: bridge
   yuvro-storage:
     external: true
-    name: yuvro_yuvro-storage
