@@ -1,62 +1,59 @@
-# ===========================================================================
 # docker-compose.dev.yml
-# Full stack for dev/production deployment (EC2)
-# Backend connects to RDS/managed DB.
-# ===========================================================================
+# Standalone dev/EC2 compose for YMarketplace.
+# Does NOT include docker-compose.yml as a base — that file
+# defines a local Postgres container with a depends_on that cannot be
+# cleanly overridden. In dev we connect to RDS, so no DB container is needed.
 
 services:
-  # ── Django Backend ─────────────────────────────────────────────────────────
-  backend:
+  ymarketplace-backend:
     build:
-      context: ./backend
+      context: backend
       dockerfile: Dockerfile
       target: dev
       args:
         - CACHEBUST=${CACHEBUST:-1}
-    container_name: yuvro-marketplace-cloudvex-backend-dev
+    container_name: yuvro-ymarketplace-backend-1
+    ports:
+      - "8004:8004"
     env_file:
-      - ./backend/.env.dev
-      - path: ./backend/.env.dev-secrets
+      - path: backend/.env.dev
+        required: false
+      - path: backend/.env.dev-secrets
         required: false
     command: >
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
              gunicorn --bind 0.0.0.0:8004 --workers 3 --timeout 120 config.wsgi:application"
-    ports:
-      - "8004:8004"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8004/api/health/"]
       interval: 15s
       timeout: 10s
-      retries: 5
-      start_period: 30s
+      retries: 10
+      start_period: 60s
     restart: always
     networks:
-      - yuvro-marketplace-cloudvex-dev
+      - ymarketplace
 
-  # ── TanStack Start Frontend (SSR) ──────────────────────────────────────────
-  frontend:
+  ymarketplace-frontend:
     build:
-      context: ./frontend
+      context: frontend
       dockerfile: Dockerfile
       target: dev
       args:
-        - VITE_BACKEND_API_BASE_URL=${VITE_BACKEND_API_BASE_URL:-https://backend-marketplace.yuvro.ai/api}
-        - VITE_YHUB_BACKEND_API_BASE_URL=${VITE_YHUB_BACKEND_API_BASE_URL:-https://backend-hub-dev.yuvro.ai/api}
+        - VITE_BACKEND_API_BASE_URL=${YMARKETPLACE_VITE_BACKEND_API_BASE_URL:-https://backend-marketplace-dev.yuvro.ai/api}
+        - VITE_YHUB_BACKEND_API_BASE_URL=${YMARKETPLACE_VITE_YHUB_BACKEND_API_BASE_URL:-https://backend-hub-dev.yuvro.ai/api}
         - CACHEBUST=${CACHEBUST:-1}
-    container_name: yuvro-marketplace-cloudvex-frontend-dev
-    env_file:
-      - ./frontend/.env.dev
-      - path: ./frontend/.env.dev-secrets
-        required: false
-    environment:
-      PORT: "3004"
-      NITRO_PORT: "3004"
+    container_name: yuvro-ymarketplace-frontend-1
     ports:
       - "3004:3004"
+    env_file:
+      - path: frontend/.env.dev
+        required: false
+      - path: frontend/.env.dev-secrets
+        required: false
     depends_on:
-      backend:
-        condition: service_healthy
+      ymarketplace-backend:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3004/"]
       interval: 15s
@@ -65,8 +62,9 @@ services:
       start_period: 60s
     restart: always
     networks:
-      - yuvro-marketplace-cloudvex-dev
+      - ymarketplace
 
 networks:
-  yuvro-marketplace-cloudvex-dev:
-    driver: bridge
+  ymarketplace:
+    external: true
+    name: yuvro_marketplace
