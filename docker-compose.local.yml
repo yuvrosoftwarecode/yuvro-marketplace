@@ -1,6 +1,7 @@
 # docker-compose.local.yml
 # Local development overrides for YMarketplace
-# Adds: PostgreSQL database, MinIO, environment files, bind mounts for live reload
+# Adds: PostgreSQL database, environment files, bind mounts for live reload
+# Note: MinIO is deployed separately via deploy-common-apps.sh (shared infrastructure)
 
 services:
   ymarketplace-db:
@@ -24,30 +25,28 @@ services:
 
   ymarketplace-backend:
     env_file:
-      - ./ymarketplace/backend/.env.local
-      - path: ./ymarketplace/backend/.env.local-secrets
+      - ./backend/.env.local
+      - path: ./backend/.env.local-secrets
         required: false
     ports:
       - "8004:8004"  # Django API
       - "9005:9001"  # Prometheus metrics (mapped from internal 9001)
     volumes:
-      - ./ymarketplace/backend:/app
+      - ./backend:/app
       - /app/venv
     depends_on:
       ymarketplace-db:
         condition: service_healthy
-      yuvro-minio:
-        condition: service_started
 
   ymarketplace-frontend:
     env_file:
-      - ./ymarketplace/frontend/.env.local
-      - path: ./ymarketplace/frontend/.env.local-secrets
+      - ./frontend/.env.local
+      - path: ./frontend/.env.local-secrets
         required: false
     ports:
       - "3004:3004"
     volumes:
-      - ./ymarketplace/frontend:/app
+      - ./frontend:/app
       - /app/node_modules
     depends_on:
       ymarketplace-backend:
