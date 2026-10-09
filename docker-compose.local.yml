@@ -25,14 +25,14 @@ services:
 
   ymarketplace-backend:
     env_file:
-      - ./backend/.env.local
-      - path: ./backend/.env.local-secrets
+      - ./ymarketplace/backend/.env.local
+      - path: ./ymarketplace/backend/.env.local-secrets
         required: false
     ports:
       - "8004:8004"  # Django API
       - "9005:9001"  # Prometheus metrics (mapped from internal 9001)
     volumes:
-      - ./backend:/app
+      - ./ymarketplace/backend:/app
       - /app/venv
     depends_on:
       ymarketplace-db:
@@ -40,13 +40,13 @@ services:
 
   ymarketplace-frontend:
     env_file:
-      - ./frontend/.env.local
-      - path: ./frontend/.env.local-secrets
+      - ./ymarketplace/frontend/.env.local
+      - path: ./ymarketplace/frontend/.env.local-secrets
         required: false
     ports:
       - "3004:3004"
     volumes:
-      - ./frontend:/app
+      - ./ymarketplace/frontend:/app
       - /app/node_modules
     depends_on:
       ymarketplace-backend:
