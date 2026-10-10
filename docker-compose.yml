@@ -1,7 +1,7 @@
 services:
   ymarketplace-backend:
     build:
-      context: ./ymarketplace/backend
+      context: ./ymarketplace-backend-api
       dockerfile: Dockerfile
       target: development
       args:
@@ -23,7 +23,7 @@ services:
 
   ymarketplace-frontend:
     build:
-      context: ./ymarketplace/frontend
+      context: ./ymarketplace-web
       dockerfile: Dockerfile
       target: development
     stdin_open: true

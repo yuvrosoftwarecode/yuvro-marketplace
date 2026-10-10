@@ -5,14 +5,14 @@
 services:
   ymarketplace-backend:
     build:
-      context: ./ymarketplace/backend
+      context: ./ymarketplace-backend-api
       dockerfile: Dockerfile
       target: production
       args:
         - CACHEBUST=${CACHEBUST:-1}
     env_file:
-      - ./ymarketplace/backend/.env.dev
-      - path: ./ymarketplace/backend/.env.dev-secrets
+      - ./ymarketplace-backend-api/.env.dev
+      - path: ./ymarketplace-backend-api/.env.dev-secrets
         required: false
     command: >
       sh -c "python manage.py migrate --noinput &&
@@ -22,7 +22,7 @@ services:
 
   ymarketplace-frontend:
     build:
-      context: ./ymarketplace/frontend
+      context: ./ymarketplace-web
       dockerfile: Dockerfile
       target: production
       args:
@@ -30,8 +30,8 @@ services:
         - VITE_YHUB_BACKEND_API_BASE_URL=${YMARKETPLACE_VITE_YHUB_BACKEND_API_BASE_URL:-https://backend-hub-dev.yuvro.ai/api}
         - CACHEBUST=${CACHEBUST:-1}
     env_file:
-      - ./ymarketplace/frontend/.env.dev
-      - path: ./ymarketplace/frontend/.env.dev-secrets
+      - ./ymarketplace-web/.env.dev
+      - path: ./ymarketplace-web/.env.dev-secrets
         required: false
     restart: always
 

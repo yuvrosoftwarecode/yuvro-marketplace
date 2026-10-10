@@ -21,7 +21,7 @@ DEPLOY_ENV  ?= local
 VALID_DEPLOY_ENVS  := local dev
 
 # Services list
-SERVICES := backend frontend
+SERVICES := ymarketplace-backend-api ymarketplace-web
 
 _validate-deploy:
 	@if ! echo "$(VALID_DEPLOY_ENVS)" | grep -qw "$(DEPLOY_ENV)"; then \
@@ -41,8 +41,8 @@ else
 endif
 
 PROJECT_NAME  := yuvro-marketplace-cloudvex
-BACKEND_SVC   := backend
-FRONTEND_SVC  := frontend
+BACKEND_SVC   := ymarketplace-backend-api
+FRONTEND_SVC  := ymarketplace-web
 DB_SVC        := db
 
 help:
@@ -83,8 +83,8 @@ _create-networks:
 	@docker network create yuvro-marketplace-dev 2>/dev/null || true
 
 secrets-template:
-	@for f in backend/.env.local.example backend/.env.dev.example \
-	           frontend/.env.local.example frontend/.env.dev.example; do \
+	@for f in ymarketplace-backend-api/.env.local.example ymarketplace-backend-api/.env.dev.example \
+	           ymarketplace-web/.env.local.example ymarketplace-web/.env.dev.example; do \
 	  dest=$${f%.example}; \
 	  if [ ! -f "$$dest" ]; then \
 	    cp "$$f" "$$dest" 2>/dev/null || true; \
@@ -97,8 +97,8 @@ secrets-template:
 secrets-validate: _validate-deploy
 	@echo "🔍 Validating .env.$(DEPLOY_ENV) files..."
 	@for var in SECRET_KEY; do \
-	  if ! grep -q "^$$var=" backend/.env.$(DEPLOY_ENV) 2>/dev/null; then \
-	    echo "  ❌ Missing $$var in backend/.env.$(DEPLOY_ENV)"; \
+	  if ! grep -q "^$$var=" ymarketplace-backend-api/.env.$(DEPLOY_ENV) 2>/dev/null; then \
+	    echo "  ❌ Missing $$var in ymarketplace-backend-api/.env.$(DEPLOY_ENV)"; \
 	    exit 1; \
 	  fi; \
 	done
