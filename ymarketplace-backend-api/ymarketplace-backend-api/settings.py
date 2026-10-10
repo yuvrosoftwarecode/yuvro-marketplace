@@ -85,7 +85,7 @@ MIDDLEWARE = [
     "core.middleware.TracingMiddleware",
 ]
 
-ROOT_URLCONF = "config.urls"
+ROOT_URLCONF = "ymarketplace-backend-api.urls"
 
 TEMPLATES = [
     {
@@ -103,8 +103,8 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "config.wsgi.application"
-ASGI_APPLICATION = "config.asgi.application"
+WSGI_APPLICATION = "ymarketplace-backend-api.wsgi.application"
+ASGI_APPLICATION = "ymarketplace-backend-api.asgi.application"
 
 # ---------------------------------------------------------------------------
 # Database
