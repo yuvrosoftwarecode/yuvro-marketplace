@@ -4,41 +4,13 @@
 
 services:
   ymarketplace-backend:
-    build:
-      context: ./ymarketplace-backend-api
-      dockerfile: Dockerfile
-      target: production
-      args:
-        - CACHEBUST=${CACHEBUST:-1}
     env_file:
       - ./ymarketplace-backend-api/.env.dev
       - path: ./ymarketplace-backend-api/.env.dev-secrets
         required: false
-    command: >
-      sh -c "python manage.py migrate --noinput &&
-             python manage.py collectstatic --noinput &&
-             gunicorn --bind 0.0.0.0:8004 --workers 3 --timeout 120 ymarketplace-backend-api.wsgi:application"
-    restart: always
 
   ymarketplace-frontend:
-    build:
-      context: ./ymarketplace-web
-      dockerfile: Dockerfile
-      target: production
-      args:
-        - VITE_BACKEND_API_BASE_URL=${YMARKETPLACE_VITE_BACKEND_API_BASE_URL:-https://backend-marketplace-dev.yuvro.ai/api}
-        - VITE_YHUB_BACKEND_API_BASE_URL=${YMARKETPLACE_VITE_YHUB_BACKEND_API_BASE_URL:-https://backend-hub-dev.yuvro.ai/api}
-        - CACHEBUST=${CACHEBUST:-1}
     env_file:
       - ./ymarketplace-web/.env.dev
       - path: ./ymarketplace-web/.env.dev-secrets
         required: false
-    restart: always
-
-networks:
-  ymarketplace:
-    external: true
-    name: yuvro_marketplace
-  yuvro-storage:
-    external: true
-    name: yuvro_yuvro-storage
