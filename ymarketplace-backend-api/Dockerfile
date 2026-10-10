@@ -33,6 +33,6 @@ FROM base as production
 ARG CACHEBUST=1
 COPY . .
 EXPOSE 8004
-CMD ["gunicorn", "--bind", "0.0.0.0:8004", "--workers", "3", "--timeout", "120", "config.wsgi:application"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8004", "--workers", "3", "--timeout", "120", "ymarketplace-backend-api.wsgi:application"]
 
 FROM production as dev
